@@ -44,15 +44,16 @@ export const BasicInfoSection = () => {
                 <RadioGroup
                   onValueChange={field.onChange}
                   value={field.value}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
                 >
                   {[
-                    { value: "apartment", label: "ბინა", icon: <Building2 className="h-5 w-5" />, desc: "მრავალსართულიან შენობაში" },
-                    { value: "house", label: "კერძო სახლი", icon: <Home className="h-5 w-5" />, desc: "ცალკე მდგომი სახლი" },
-                    { value: "cottage", label: "აგარაკი", icon: <Tent className="h-5 w-5" />, desc: "დასასვენებლად განკუთვნილი" },
-                    { value: "land", label: "მიწის ნაკვეთი", icon: <MapPin className="h-5 w-5" />, desc: "სამშენებლო ან სასოფლო-სამეურნეო" },
-                    { value: "commercial", label: "კომერციული ფართი", icon: <Briefcase className="h-5 w-5" />, desc: "ოფისი, მაღაზია, საწყობი" },
-                    { value: "hotel", label: "სასტუმრო", icon: <Hotel className="h-5 w-5" />, desc: "სასტუმრო ან გესტჰაუსი" }
+                    { value: "apartment", label: "ბინები", icon: <Building2 className="h-5 w-5" />, desc: "მრავალსართულიან შენობაში" },
+                    { value: "house", label: "კერძო სახლები", icon: <Home className="h-5 w-5" />, desc: "ცალკე მდგომი სახლი" },
+                    { value: "cottage", label: "აგრაკები", icon: <Tent className="h-5 w-5" />, desc: "დასასვენებლად განკუთვნილი" },
+                    { value: "land", label: "მიწის ნაკვეთები", icon: <MapPin className="h-5 w-5" />, desc: "სამშენებლო ან სასოფლო-სამეურნეო" },
+                    { value: "commercial", label: "კომერციული ფართები", icon: <Briefcase className="h-5 w-5" />, desc: "მაღაზია, საწყობი" },
+                    { value: "office", label: "საოფისე ფართები", icon: <Briefcase className="h-5 w-5" />, desc: "საოფისე სივრცე" },
+                    { value: "hotel", label: "სასტუმროები", icon: <Hotel className="h-5 w-5" />, desc: "სასტუმრო ან გესტჰაუსი" }
                   ].map((option) => (
                     <label
                       key={option.value}
@@ -110,12 +111,13 @@ export const BasicInfoSection = () => {
                 <RadioGroup
                   onValueChange={field.onChange}
                   value={field.value}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
                 >
                   {[
                     { value: "sale", label: "იყიდება", desc: "სრული გაყიდვა" },
                     { value: "rent", label: "ქირავდება", desc: "გრძელვადიანი ქირა" },
                     { value: "mortgage", label: "გირავდება", desc: "გირავით გადაცემა" },
+                    { value: "lease", label: "გაიცემა იჯარით", desc: "კომერციული იჯარა" },
                     { value: "daily", label: "ქირავდება დღიურად", desc: "მოკლევადიანი ქირა" }
                   ].map((option) => (
                     <label
