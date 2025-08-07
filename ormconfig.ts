@@ -5,6 +5,7 @@ dotenv.config();
 
 export default new DataSource({
   type: 'postgres',
+  url: process.env.DATABASE_URL,
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
   username: process.env.DB_USERNAME || 'postgres',
@@ -14,5 +15,6 @@ export default new DataSource({
   logging: true,
   entities: ['src/models/*.ts'],
   migrations: ['src/migrations/*.ts'],
-  subscribers: ['src/subscribers/*.ts']
+  subscribers: ['src/subscribers/*.ts'],
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
