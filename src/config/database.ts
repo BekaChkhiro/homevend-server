@@ -5,6 +5,7 @@ import { Property } from '../models/Property.js';
 // Create a new DataSource instance with proper typing
 export const AppDataSource = new DataSource({
   type: 'postgres',
+  url: process.env.DATABASE_URL,
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
   username: process.env.DB_USERNAME || 'postgres',
@@ -15,9 +16,9 @@ export const AppDataSource = new DataSource({
   entities: [User, Property],
   migrations: ['dist/migrations/*.js'],
   subscribers: ['dist/subscribers/*.js'],
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : true,
   extra: {
-    trustServerCertificate: true
+    ssl: process.env.NODE_ENV === 'production' || process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
   }
 });
 
