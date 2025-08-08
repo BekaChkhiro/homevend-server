@@ -160,7 +160,7 @@ export const updateProperty = async (req: AuthenticatedRequest, res: Response): 
     const propertyRepository = AppDataSource.getRepository(Property);
     
     const property = await propertyRepository.findOne({
-      where: { id }
+      where: { id: Number(id) }
     });
     
     if (!property) {
@@ -202,7 +202,7 @@ export const deleteProperty = async (req: AuthenticatedRequest, res: Response): 
     const propertyRepository = AppDataSource.getRepository(Property);
     
     const property = await propertyRepository.findOne({
-      where: { id }
+      where: { id: Number(id) }
     });
     
     if (!property) {
@@ -252,7 +252,7 @@ export const approveProperty = async (req: AuthenticatedRequest, res: Response):
     const propertyRepository = AppDataSource.getRepository(Property);
     
     const property = await propertyRepository.findOne({
-      where: { id }
+      where: { id: Number(id) }
     });
     
     if (!property) {

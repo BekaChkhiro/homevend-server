@@ -49,7 +49,7 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
     const propertyRepository = AppDataSource.getRepository(Property);
     
     const user = await userRepository.findOne({
-      where: { id },
+      where: { id: Number(id) },
       select: ['id', 'fullName', 'email', 'role', 'createdAt', 'updatedAt']
     });
     
@@ -62,7 +62,7 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
     }
     
     const propertyCount = await propertyRepository.count({
-      where: { userId: id }
+      where: { userId: Number(id) }
     });
     
     res.status(200).json({
@@ -97,7 +97,7 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response): 
     const userRepository = AppDataSource.getRepository(User);
     
     const user = await userRepository.findOne({
-      where: { id }
+      where: { id: Number(id) }
     });
     
     if (!user) {
@@ -144,7 +144,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
     const userRepository = AppDataSource.getRepository(User);
     
     const user = await userRepository.findOne({
-      where: { id }
+      where: { id: Number(id) }
     });
     
     if (!user) {

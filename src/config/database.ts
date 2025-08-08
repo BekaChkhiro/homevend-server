@@ -4,6 +4,8 @@ dotenv.config();
 import { DataSource } from 'typeorm';
 import { User } from '../models/User.js';
 import { Property } from '../models/Property.js';
+import { District } from '../models/District.js';
+import { PriceStatistic } from '../models/PriceStatistic.js';
 
 // Create a new DataSource instance with proper typing
 // Use DATABASE_URL if available, otherwise use individual parameters
@@ -25,7 +27,7 @@ export const AppDataSource = new DataSource({
   ...dbConfig,
   synchronize: false, // Always use migrations instead
   logging: process.env.NODE_ENV === 'development',
-  entities: [User, Property],
+  entities: [User, Property, District, PriceStatistic],
   migrations: ['dist/migrations/*.js'],
   subscribers: ['dist/subscribers/*.js']
 });
