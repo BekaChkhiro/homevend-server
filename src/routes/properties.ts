@@ -5,8 +5,7 @@ import {
   getPropertyById,
   getUserProperties,
   updateProperty, 
-  deleteProperty,
-  approveProperty
+  deleteProperty
 } from '../controllers/propertyController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
@@ -24,6 +23,5 @@ router.post('/', validate(propertySchema), createProperty);
 router.put('/:id', validate(propertySchema), updateProperty);
 router.delete('/:id', deleteProperty);
 
-router.patch('/:id/status', authorize('admin'), approveProperty);
 
 export default router;

@@ -11,7 +11,6 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     const property = new Property();
     Object.assign(property, req.body);
     property.userId = req.user!.id;
-    property.status = 'pending';
     
     await propertyRepository.save(property);
     
@@ -39,14 +38,12 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       dealType,
       minPrice,
       maxPrice,
-      status
     } = req.query;
     
     const propertyRepository = AppDataSource.getRepository(Property);
     
     const where: any = {};
     
-    if (status) where.status = status;
     if (city) where.city = Like(`%${city}%`);
     if (propertyType) where.propertyType = propertyType;
     if (dealType) where.dealType = dealType;
@@ -236,46 +233,3 @@ export const deleteProperty = async (req: AuthenticatedRequest, res: Response): 
   }
 };
 
-export const approveProperty = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    
-    if (!['active', 'inactive', 'pending', 'sold'].includes(status)) {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid status'
-      });
-      return;
-    }
-    
-    const propertyRepository = AppDataSource.getRepository(Property);
-    
-    const property = await propertyRepository.findOne({
-      where: { id: Number(id) }
-    });
-    
-    if (!property) {
-      res.status(404).json({
-        success: false,
-        message: 'Property not found'
-      });
-      return;
-    }
-    
-    property.status = status;
-    await propertyRepository.save(property);
-    
-    res.status(200).json({
-      success: true,
-      message: `Property status changed to ${status}`,
-      data: property
-    });
-  } catch (error) {
-    console.error('Approve property error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update property status'
-    });
-  }
-};
