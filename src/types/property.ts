@@ -74,8 +74,7 @@ export interface IProperty {
   // Photos
   photos: string[];
 
-  // Status and metadata
-  status: 'active' | 'inactive' | 'pending' | 'sold';
+  // Metadata
   viewCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -186,7 +185,6 @@ export interface PropertyResponse {
   descriptionEnglish?: string;
   descriptionRussian?: string;
   photos: string[];
-  status: 'active' | 'inactive' | 'pending' | 'sold';
   viewCount: number;
   createdAt: Date;
   updatedAt: Date;

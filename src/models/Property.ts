@@ -12,7 +12,6 @@ import { User } from './User.js';
 
 @Entity('properties')
 @Index('IDX_PROPERTY_USER', ['userId'])
-@Index('IDX_PROPERTY_STATUS', ['status'])
 @Index('IDX_PROPERTY_CITY', ['city'])
 @Index('IDX_PROPERTY_DEAL_TYPE', ['dealType'])
 @Index('IDX_PROPERTY_PROPERTY_TYPE', ['propertyType'])
@@ -256,14 +255,7 @@ export class Property {
   })
   photos!: string[];
 
-  // Status and metadata
-  @Column({
-    type: 'enum',
-    enum: ['active', 'inactive', 'pending', 'sold'],
-    default: 'active'
-  })
-  status!: 'active' | 'inactive' | 'pending' | 'sold';
-
+  // Metadata
   @Column({
     type: 'integer',
     default: 0
