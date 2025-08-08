@@ -1,18 +1,18 @@
+// Load environment variables FIRST before any other imports
+import dotenv from 'dotenv';
+dotenv.config();
+
 import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
-import dotenv from 'dotenv';
 import { connectDB, AppDataSource } from './config/database.js';
 import routes from './routes/index.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { sanitizeInput, preventSQLInjection } from './middleware/security.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
