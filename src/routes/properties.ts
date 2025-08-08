@@ -15,11 +15,11 @@ import { propertySchema } from '../utils/validation.js';
 const router = Router();
 
 router.get('/', getProperties);
+router.get('/:id', getPropertyById);
 
 router.use(authenticate);
 
 router.get('/user/my-properties', getUserProperties);
-router.get('/:id', getPropertyById);
 router.post('/', validate(propertySchema), createProperty);
 router.put('/:id', validate(propertySchema), updateProperty);
 router.delete('/:id', deleteProperty);
