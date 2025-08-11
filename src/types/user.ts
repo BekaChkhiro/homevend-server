@@ -1,9 +1,17 @@
+import { UserRoleEnum } from '../models/User.js';
+
 export interface IUser {
   id: number;
-  fullName: string;
+  uuid: string;
   email: string;
   password: string;
-  role: 'user' | 'admin';
+  fullName: string;
+  phone?: string;
+  role: UserRoleEnum;
+  isVerified: boolean;
+  isActive: boolean;
+  profileImageUrl?: string;
+  lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -13,7 +21,8 @@ export interface CreateUserInput {
   fullName: string;
   email: string;
   password: string;
-  role?: 'user' | 'admin';
+  phone?: string;
+  role?: UserRoleEnum;
 }
 
 export interface LoginInput {
@@ -23,9 +32,21 @@ export interface LoginInput {
 
 export interface UserResponse {
   id: number;
+  uuid: string;
   fullName: string;
   email: string;
-  role: 'user' | 'admin';
+  phone?: string;
+  role: UserRoleEnum;
+  isVerified: boolean;
+  isActive: boolean;
+  profileImageUrl?: string;
+  lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface UpdateUserInput {
+  fullName?: string;
+  phone?: string;
+  profileImageUrl?: string;
 }

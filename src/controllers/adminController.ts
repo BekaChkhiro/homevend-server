@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AppDataSource } from '../config/database.js';
-import { User } from '../models/User.js';
+import { User, UserRoleEnum } from '../models/User.js';
 import { Property } from '../models/Property.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 
@@ -188,8 +188,8 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
       totalAdmins,
       totalProperties
     ] = await Promise.all([
-      userRepository.count({ where: { role: 'user' } }),
-      userRepository.count({ where: { role: 'admin' } }),
+      userRepository.count({ where: { role: UserRoleEnum.USER } }),
+      userRepository.count({ where: { role: UserRoleEnum.ADMIN } }),
       propertyRepository.count()
     ]);
     

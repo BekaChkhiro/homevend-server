@@ -1,191 +1,308 @@
+import { 
+  PropertyTypeEnum, 
+  DealTypeEnum, 
+  BuildingStatusEnum, 
+  ConstructionYearEnum, 
+  ConditionEnum 
+} from '../models/Property.js';
+
+export interface ICity {
+  id: number;
+  code: string;
+  nameGeorgian: string;
+  nameEnglish?: string;
+  region?: string;
+}
+
+export interface IFeature {
+  id: number;
+  code: string;
+  nameGeorgian: string;
+  nameEnglish?: string;
+  iconName?: string;
+  category?: string;
+}
+
+export interface IAdvantage {
+  id: number;
+  code: string;
+  nameGeorgian: string;
+  nameEnglish?: string;
+  iconName?: string;
+  category?: string;
+}
+
+export interface IFurnitureAppliance {
+  id: number;
+  code: string;
+  nameGeorgian: string;
+  nameEnglish?: string;
+  category?: string;
+}
+
+export interface ITag {
+  id: number;
+  code: string;
+  nameGeorgian: string;
+  nameEnglish?: string;
+  iconName?: string;
+  color?: string;
+}
+
+export interface IPropertyPhoto {
+  id: number;
+  fileName: string;
+  originalName?: string;
+  filePath: string;
+  fileSize?: number;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  altText?: string;
+  isPrimary: boolean;
+  sortOrder: number;
+}
+
 export interface IProperty {
-  id: string;
-  userId: string;
+  id: number;
+  uuid: string;
+  userId: number;
   
-  // Basic Info
+  // Basic Information
   title: string;
-  propertyType: string;
-  dealType: string;
-  city: string;
+  propertyType: PropertyTypeEnum;
+  dealType: DealTypeEnum;
+  
+  // Location
+  cityId: number;
+  city: ICity;
+  district?: string;
   street: string;
   streetNumber?: string;
+  postalCode?: string;
   cadastralCode?: string;
+  latitude?: number;
+  longitude?: number;
 
   // Property Details
   rooms?: string;
   bedrooms?: string;
   bathrooms?: string;
   totalFloors?: string;
-  buildingStatus?: string;
-  constructionYear?: string;
-  condition?: string;
+  propertyFloor?: string;
+  buildingStatus?: BuildingStatusEnum;
+  constructionYear?: ConstructionYearEnum;
+  condition?: ConditionEnum;
   projectType?: string;
-  ceilingHeight?: string;
+  ceilingHeight?: number;
+  
+  // Infrastructure
   heating?: string;
   parking?: string;
   hotWater?: string;
   buildingMaterial?: string;
 
-  // Conditional fields
+  // Conditional Features
   hasBalcony: boolean;
-  balconyCount?: string;
-  balconyArea?: string;
+  balconyCount?: number;
+  balconyArea?: number;
   
   hasPool: boolean;
   poolType?: string;
   
   hasLivingRoom: boolean;
-  livingRoomArea?: string;
+  livingRoomArea?: number;
   livingRoomType?: string;
   
   hasLoggia: boolean;
-  loggiaArea?: string;
+  loggiaArea?: number;
   
   hasVeranda: boolean;
-  verandaArea?: string;
+  verandaArea?: number;
   
   hasYard: boolean;
-  yardArea?: string;
+  yardArea?: number;
   
   hasStorage: boolean;
-  storageArea?: string;
+  storageArea?: number;
   storageType?: string;
 
-  // Features and amenities
-  features: string[];
-  advantages: string[];
-  furnitureAppliances: string[];
-  tags: string[];
+  // Related entities
+  features: IFeature[];
+  advantages: IAdvantage[];
+  furnitureAppliances: IFurnitureAppliance[];
+  tags: ITag[];
 
-  // Price & Area
-  area: string;
-  totalPrice: string;
-  pricePerSqm?: string;
+  // Pricing
+  area: number;
+  totalPrice: number;
+  pricePerSqm?: number;
+  currency: string;
 
-  // Contact Info
+  // Contact Information
   contactName: string;
   contactPhone: string;
+  contactEmail?: string;
 
   // Descriptions
   descriptionGeorgian?: string;
   descriptionEnglish?: string;
   descriptionRussian?: string;
 
-  // Photos
-  photos: string[];
+  // SEO & Meta
+  metaTitle?: string;
+  metaDescription?: string;
+  slug?: string;
 
-  // Metadata
+  // Status & Metrics
   viewCount: number;
+  favoriteCount: number;
+  inquiryCount: number;
+  isFeatured: boolean;
+  featuredUntil?: Date;
+
+  // Photos
+  photos: IPropertyPhoto[];
+
+  // Dates
   createdAt: Date;
   updatedAt: Date;
+  publishedAt?: Date;
+  expiresAt?: Date;
 }
 
 export interface CreatePropertyInput {
   title: string;
-  propertyType: string;
-  dealType: string;
-  city: string;
+  propertyType: PropertyTypeEnum;
+  dealType: DealTypeEnum;
+  
+  // Location
+  cityId: number;
+  district?: string;
   street: string;
   streetNumber?: string;
+  postalCode?: string;
   cadastralCode?: string;
+  latitude?: number;
+  longitude?: number;
+  
+  // Property Details
   rooms?: string;
   bedrooms?: string;
   bathrooms?: string;
   totalFloors?: string;
-  buildingStatus?: string;
-  constructionYear?: string;
-  condition?: string;
+  propertyFloor?: string;
+  buildingStatus?: BuildingStatusEnum;
+  constructionYear?: ConstructionYearEnum;
+  condition?: ConditionEnum;
   projectType?: string;
-  ceilingHeight?: string;
+  ceilingHeight?: number;
+  
+  // Infrastructure
   heating?: string;
   parking?: string;
   hotWater?: string;
   buildingMaterial?: string;
+  
+  // Conditional Features
   hasBalcony?: boolean;
-  balconyCount?: string;
-  balconyArea?: string;
+  balconyCount?: number;
+  balconyArea?: number;
   hasPool?: boolean;
   poolType?: string;
   hasLivingRoom?: boolean;
-  livingRoomArea?: string;
+  livingRoomArea?: number;
   livingRoomType?: string;
   hasLoggia?: boolean;
-  loggiaArea?: string;
+  loggiaArea?: number;
   hasVeranda?: boolean;
-  verandaArea?: string;
+  verandaArea?: number;
   hasYard?: boolean;
-  yardArea?: string;
+  yardArea?: number;
   hasStorage?: boolean;
-  storageArea?: string;
+  storageArea?: number;
   storageType?: string;
-  features?: string[];
-  advantages?: string[];
-  furnitureAppliances?: string[];
-  tags?: string[];
-  area: string;
-  totalPrice: string;
-  pricePerSqm?: string;
+  
+  // Related entities (IDs)
+  features?: number[];
+  advantages?: number[];
+  furnitureAppliances?: number[];
+  tags?: number[];
+  
+  // Pricing
+  area: number;
+  totalPrice: number;
+  pricePerSqm?: number;
+  currency?: string;
+  
+  // Contact Information
   contactName: string;
   contactPhone: string;
+  contactEmail?: string;
+  
+  // Descriptions
   descriptionGeorgian?: string;
   descriptionEnglish?: string;
   descriptionRussian?: string;
+  
+  // SEO & Meta
+  metaTitle?: string;
+  metaDescription?: string;
+  
+  // Photos (input data for creating photos)
+  photos?: CreatePropertyPhotoInput[];
 }
 
-export interface PropertyResponse {
-  id: string;
-  userId: string;
-  title: string;
-  propertyType: string;
-  dealType: string;
-  city: string;
-  street: string;
-  streetNumber?: string;
-  cadastralCode?: string;
+export interface CreatePropertyPhotoInput {
+  fileName: string;
+  originalName?: string;
+  filePath: string;
+  fileSize?: number;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  altText?: string;
+  isPrimary?: boolean;
+}
+
+export interface PropertyResponse extends IProperty {
+  user: {
+    id: number;
+    fullName: string;
+    email: string;
+    phone?: string;
+  };
+}
+
+export interface PropertyListResponse {
+  success: boolean;
+  data: {
+    properties: PropertyResponse[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  };
+}
+
+export interface PropertyFilterInput {
+  page?: number;
+  limit?: number;
+  cityId?: number;
+  propertyType?: PropertyTypeEnum;
+  dealType?: DealTypeEnum;
+  minPrice?: number;
+  maxPrice?: number;
+  minArea?: number;
+  maxArea?: number;
+  district?: string;
   rooms?: string;
   bedrooms?: string;
   bathrooms?: string;
-  totalFloors?: string;
-  buildingStatus?: string;
-  constructionYear?: string;
-  condition?: string;
-  projectType?: string;
-  ceilingHeight?: string;
-  heating?: string;
-  parking?: string;
-  hotWater?: string;
-  buildingMaterial?: string;
-  hasBalcony: boolean;
-  balconyCount?: string;
-  balconyArea?: string;
-  hasPool: boolean;
-  poolType?: string;
-  hasLivingRoom: boolean;
-  livingRoomArea?: string;
-  livingRoomType?: string;
-  hasLoggia: boolean;
-  loggiaArea?: string;
-  hasVeranda: boolean;
-  verandaArea?: string;
-  hasYard: boolean;
-  yardArea?: string;
-  hasStorage: boolean;
-  storageArea?: string;
-  storageType?: string;
-  features: string[];
-  advantages: string[];
-  furnitureAppliances: string[];
-  tags: string[];
-  area: string;
-  totalPrice: string;
-  pricePerSqm?: string;
-  contactName: string;
-  contactPhone: string;
-  descriptionGeorgian?: string;
-  descriptionEnglish?: string;
-  descriptionRussian?: string;
-  photos: string[];
-  viewCount: number;
-  createdAt: Date;
-  updatedAt: Date;
+  features?: number[];
+  advantages?: number[];
+  tags?: number[];
+  isFeatured?: boolean;
 }

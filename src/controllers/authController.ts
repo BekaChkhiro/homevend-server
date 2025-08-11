@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database.js';
-import { User } from '../models/User.js';
+import { User, UserRoleEnum } from '../models/User.js';
 import { generateToken } from '../utils/jwt.js';
 import { generateTokenPair, verifyRefreshToken, generateAccessToken, revokeRefreshToken } from '../utils/refreshToken.js';
 import { LoginResponse } from '../types/auth.js';
@@ -8,7 +8,7 @@ import { AuthenticatedRequest } from '../types/auth.js';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { fullName, email, password, role = 'user' } = req.body;
+    const { fullName, email, password, role = UserRoleEnum.USER } = req.body;
 
     const userRepository = AppDataSource.getRepository(User);
 
