@@ -12,8 +12,11 @@ import { FindManyOptions, Like, ILike, In, Between, MoreThanOrEqual, LessThanOrE
 
 export const createProperty = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    console.log('🔥 =================================');
     console.log('📨 Property creation request received');
+    console.log('👤 User ID:', req.userId);
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
+    console.log('🔥 =================================');
     
     const propertyRepository = AppDataSource.getRepository(Property);
     const cityRepository = AppDataSource.getRepository(City);
@@ -145,7 +148,11 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     }
     
     if (requiredFieldErrors.length > 0) {
-      console.error('❌ Missing required fields:', requiredFieldErrors);
+      console.error('🚨 =================================');
+      console.error('❌ Missing required fields validation failed');
+      console.error('❌ Errors:', requiredFieldErrors);
+      console.error('❌ Property data received:', JSON.stringify(propertyData, null, 2));
+      console.error('🚨 =================================');
       res.status(400).json({
         success: false,
         message: 'Missing required fields',
@@ -243,7 +250,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     property.contactPhone = propertyData.contactPhone;
     
     // Optional location fields
-    if (propertyData.district) property.district = propertyData.district;
+    if (propertyData.areaId) property.areaId = propertyData.areaId;
     if (propertyData.streetNumber) property.streetNumber = propertyData.streetNumber;
     if (propertyData.postalCode) property.postalCode = propertyData.postalCode;
     if (propertyData.cadastralCode) property.cadastralCode = propertyData.cadastralCode;
@@ -616,7 +623,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       maxPrice,
       minArea,
       maxArea,
-      district,
+      areaId,
       rooms,
       bedrooms,
       bathrooms,
@@ -627,20 +634,17 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     } = req.query;
     
     const propertyRepository = AppDataSource.getRepository(Property);
+
+    const where: any = {};
     
-    // Build query with only needed joins
-    const queryBuilder = propertyRepository
-      .createQueryBuilder('property')
-      .leftJoinAndSelect('property.city', 'city')
-      .leftJoinAndSelect('property.user', 'user')
-      .leftJoin('property.photos', 'photos', 'photos.isPrimary = true')
-      .addSelect(['photos.filePath']);
+    // Location filters
+    if (cityId) where.cityId = cityId;
+    if (areaId) where.areaId = areaId;
     
-    // Add conditional filters
-    if (cityId) queryBuilder.andWhere('property.cityId = :cityId', { cityId });
-    if (district) queryBuilder.andWhere('property.district ILIKE :district', { district: `%${district}%` });
-    if (propertyType) queryBuilder.andWhere('property.propertyType = :propertyType', { propertyType });
-    if (dealType) queryBuilder.andWhere('property.dealType = :dealType', { dealType });
+    // Basic filters
+    if (propertyType) where.propertyType = propertyType;
+    if (dealType) where.dealType = dealType;
+
     
     // Price range
     if (minPrice) queryBuilder.andWhere('property.totalPrice >= :minPrice', { minPrice: Number(minPrice) });
@@ -651,9 +655,34 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     if (maxArea) queryBuilder.andWhere('property.area <= :maxArea', { maxArea: Number(maxArea) });
     
     // Property details
-    if (rooms) queryBuilder.andWhere('property.rooms = :rooms', { rooms });
-    if (bedrooms) queryBuilder.andWhere('property.bedrooms = :bedrooms', { bedrooms });
-    if (bathrooms) queryBuilder.andWhere('property.bathrooms = :bathrooms', { bathrooms });
+
+    if (rooms) where.rooms = rooms;
+    if (bedrooms) where.bedrooms = bedrooms;
+    if (bathrooms) where.bathrooms = bathrooms;
+
+    // Featured filter
+    if (isFeatured === 'true') where.isFeatured = true;
+    
+    const options: FindManyOptions<Property> = {
+      where,
+      take: Number(limit),
+      skip: (Number(page) - 1) * Number(limit),
+      order: { 
+        isFeatured: 'DESC',
+        createdAt: 'DESC' 
+      },
+      relations: [
+        'user', 
+        'city',
+        'area',
+        'features',
+        'advantages',
+        'furnitureAppliances',
+        'tags',
+        'photos'
+      ]
+    };
+
     
     // Featured filter
     if (isFeatured === 'true') queryBuilder.andWhere('property.isFeatured = true');
@@ -754,7 +783,8 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
       where: { id: propertyId },
       relations: [
         'user',
-        'city', 
+        'city',
+        'area', 
         'features',
         'advantages',
         'furnitureAppliances',
@@ -833,6 +863,14 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
           nameGeorgian: property.city?.nameGeorgian,
           nameEnglish: property.city?.nameEnglish
         },
+        areaData: property.area ? {
+          id: property.area.id,
+          cityId: property.area.cityId,
+          nameKa: property.area.nameKa,
+          nameEn: property.area.nameEn,
+          nameRu: property.area.nameRu
+        } : null,
+        district: property.area?.nameKa || '', // For backward compatibility
         photos: property.photos?.sort((a, b) => a.sortOrder - b.sortOrder)?.map(photo => photo.filePath) || []
       }
     });
@@ -850,15 +888,21 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
     const userId = req.user!.id;
     const propertyRepository = AppDataSource.getRepository(Property);
     
-    // Optimized query with only essential data
-    const properties = await propertyRepository
-      .createQueryBuilder('property')
-      .leftJoinAndSelect('property.city', 'city')
-      .leftJoin('property.photos', 'photos', 'photos.isPrimary = true')
-      .addSelect(['photos.filePath'])
-      .where('property.userId = :userId', { userId })
-      .orderBy('property.createdAt', 'DESC')
-      .getMany();
+
+    const properties = await propertyRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      relations: [
+        'city',
+        'area',
+        'features',
+        'advantages',
+        'furnitureAppliances',
+        'tags',
+        'photos'
+      ]
+    });
+
     
     res.status(200).json({
       success: true,
@@ -994,7 +1038,7 @@ export const updateProperty = async (req: AuthenticatedRequest, res: Response): 
     if (propertyData.contactPhone !== undefined) property.contactPhone = propertyData.contactPhone;
     
     // Optional location fields
-    if (propertyData.district !== undefined) property.district = propertyData.district;
+    if (propertyData.areaId !== undefined) property.areaId = propertyData.areaId;
     if (propertyData.streetNumber !== undefined) property.streetNumber = propertyData.streetNumber;
     if (propertyData.postalCode !== undefined) property.postalCode = propertyData.postalCode;
     if (propertyData.cadastralCode !== undefined) property.cadastralCode = propertyData.cadastralCode;

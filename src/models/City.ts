@@ -22,6 +22,9 @@ export class City {
   @Column({ name: 'name_english', type: 'varchar', length: 100, nullable: true })
   nameEnglish?: string;
 
+  @Column({ name: 'name_russian', type: 'varchar', length: 100, nullable: true })
+  nameRussian?: string;
+
   @Column({ type: 'varchar', length: 100, nullable: true })
   region?: string;
 

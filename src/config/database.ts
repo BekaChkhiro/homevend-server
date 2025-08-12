@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { User } from '../models/User.js';
 import { Property } from '../models/Property.js';
 import { District } from '../models/District.js';
+import { Area } from '../models/Area.js';
 import { PriceStatistic } from '../models/PriceStatistic.js';
 import { City } from '../models/City.js';
 import { Feature } from '../models/Feature.js';
@@ -40,6 +41,7 @@ export const AppDataSource = new DataSource({
     User, 
     Property, 
     District, 
+    Area,
     PriceStatistic, 
     City, 
     Feature, 

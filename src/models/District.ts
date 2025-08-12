@@ -12,6 +12,7 @@ import type { PriceStatistic } from './PriceStatistic.js';
 @Entity('districts')
 @Index('IDX_DISTRICT_NAME_KA', ['nameKa'], { unique: true })
 @Index('IDX_DISTRICT_NAME_EN', ['nameEn'], { unique: true })
+@Index('IDX_DISTRICT_NAME_RU', ['nameRu'], { unique: true })
 export class District {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -33,6 +34,15 @@ export class District {
     name: 'name_en'
   })
   nameEn!: string; // English name
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    unique: true,
+    name: 'name_ru'
+  })
+  nameRu!: string; // Russian name
 
   @Column({
     type: 'text',

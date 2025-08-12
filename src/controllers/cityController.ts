@@ -1,16 +1,22 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database.js';
 import { City } from '../models/City.js';
+import { District } from '../models/District.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 import { ILike } from 'typeorm';
 
 export const getAllCities = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { isActive = true } = req.query;
+    const { isActive } = req.query;
     const cityRepository = AppDataSource.getRepository(City);
     
+    let whereCondition = {};
+    if (isActive !== undefined) {
+      whereCondition = { isActive: isActive === 'true' };
+    }
+    
     const cities = await cityRepository.find({
-      where: { isActive: isActive === 'true' },
+      where: whereCondition,
       order: { nameGeorgian: 'ASC' }
     });
     
@@ -59,7 +65,7 @@ export const getCityById = async (req: Request, res: Response): Promise<void> =>
 
 export const createCity = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { code, nameGeorgian, nameEnglish, region, isActive = true } = req.body;
+    const { code, nameGeorgian, nameEnglish, nameRussian, region, isActive = true } = req.body;
     const cityRepository = AppDataSource.getRepository(City);
     
     // Check if city with this code already exists
@@ -76,6 +82,7 @@ export const createCity = async (req: AuthenticatedRequest, res: Response): Prom
     city.code = code;
     city.nameGeorgian = nameGeorgian;
     city.nameEnglish = nameEnglish;
+    city.nameRussian = nameRussian;
     city.region = region;
     city.isActive = isActive;
     
@@ -98,7 +105,7 @@ export const createCity = async (req: AuthenticatedRequest, res: Response): Prom
 export const updateCity = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { code, nameGeorgian, nameEnglish, region, isActive } = req.body;
+    const { code, nameGeorgian, nameEnglish, nameRussian, region, isActive } = req.body;
     const cityRepository = AppDataSource.getRepository(City);
     
     const city = await cityRepository.findOne({ where: { id: parseInt(id) } });
@@ -125,6 +132,7 @@ export const updateCity = async (req: AuthenticatedRequest, res: Response): Prom
     if (code !== undefined) city.code = code;
     if (nameGeorgian !== undefined) city.nameGeorgian = nameGeorgian;
     if (nameEnglish !== undefined) city.nameEnglish = nameEnglish;
+    if (nameRussian !== undefined) city.nameRussian = nameRussian;
     if (region !== undefined) city.region = region;
     if (isActive !== undefined) city.isActive = isActive;
     
@@ -204,6 +212,7 @@ export const searchCities = async (req: Request, res: Response): Promise<void> =
       where: [
         { nameGeorgian: ILike(`%${searchTerm}%`) },
         { nameEnglish: ILike(`%${searchTerm}%`) },
+        { nameRussian: ILike(`%${searchTerm}%`) },
         { code: ILike(`%${searchTerm.toLowerCase()}%`) }
       ],
       order: { nameGeorgian: 'ASC' },
@@ -222,3 +231,4 @@ export const searchCities = async (req: Request, res: Response): Promise<void> =
     });
   }
 };
+
