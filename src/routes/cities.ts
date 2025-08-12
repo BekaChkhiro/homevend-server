@@ -5,7 +5,7 @@ import {
   createCity, 
   updateCity, 
   deleteCity,
-  searchCities 
+  searchCities
 } from '../controllers/cityController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { UserRoleEnum } from '../models/User.js';

@@ -13,6 +13,7 @@ import {
 } from 'typeorm';
 import { User } from './User.js';
 import { City } from './City.js';
+import { Area } from './Area.js';
 import { Feature } from './Feature.js';
 import { Advantage } from './Advantage.js';
 import { FurnitureAppliance } from './FurnitureAppliance.js';
@@ -107,8 +108,12 @@ export class Property {
   @JoinColumn({ name: 'city_id' })
   city!: City;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  district?: string;
+  @Column({ name: 'area_id', type: 'integer', nullable: true })
+  areaId?: number;
+
+  @ManyToOne(() => Area, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'area_id' })
+  area?: Area;
 
   @Column({ type: 'varchar', length: 200, nullable: false })
   street!: string;

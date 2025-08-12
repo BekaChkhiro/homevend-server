@@ -12,8 +12,11 @@ import { FindManyOptions, Like, ILike, In, Between, MoreThanOrEqual, LessThanOrE
 
 export const createProperty = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    console.log('🔥 =================================');
     console.log('📨 Property creation request received');
+    console.log('👤 User ID:', req.userId);
     console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
+    console.log('🔥 =================================');
     
     const propertyRepository = AppDataSource.getRepository(Property);
     const cityRepository = AppDataSource.getRepository(City);
@@ -145,7 +148,11 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     }
     
     if (requiredFieldErrors.length > 0) {
-      console.error('❌ Missing required fields:', requiredFieldErrors);
+      console.error('🚨 =================================');
+      console.error('❌ Missing required fields validation failed');
+      console.error('❌ Errors:', requiredFieldErrors);
+      console.error('❌ Property data received:', JSON.stringify(propertyData, null, 2));
+      console.error('🚨 =================================');
       res.status(400).json({
         success: false,
         message: 'Missing required fields',
@@ -243,7 +250,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     property.contactPhone = propertyData.contactPhone;
     
     // Optional location fields
-    if (propertyData.district) property.district = propertyData.district;
+    if (propertyData.areaId) property.areaId = propertyData.areaId;
     if (propertyData.streetNumber) property.streetNumber = propertyData.streetNumber;
     if (propertyData.postalCode) property.postalCode = propertyData.postalCode;
     if (propertyData.cadastralCode) property.cadastralCode = propertyData.cadastralCode;
@@ -616,7 +623,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       maxPrice,
       minArea,
       maxArea,
-      district,
+      areaId,
       rooms,
       bedrooms,
       bathrooms,
@@ -632,7 +639,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     
     // Location filters
     if (cityId) where.cityId = cityId;
-    if (district) where.district = Like(`%${district}%`);
+    if (areaId) where.areaId = areaId;
     
     // Basic filters
     if (propertyType) where.propertyType = propertyType;
@@ -675,6 +682,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       relations: [
         'user', 
         'city',
+        'area',
         'features',
         'advantages',
         'furnitureAppliances',
@@ -746,7 +754,8 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
       where: { id: propertyId },
       relations: [
         'user',
-        'city', 
+        'city',
+        'area', 
         'features',
         'advantages',
         'furnitureAppliances',
@@ -825,6 +834,14 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
           nameGeorgian: property.city?.nameGeorgian,
           nameEnglish: property.city?.nameEnglish
         },
+        areaData: property.area ? {
+          id: property.area.id,
+          cityId: property.area.cityId,
+          nameKa: property.area.nameKa,
+          nameEn: property.area.nameEn,
+          nameRu: property.area.nameRu
+        } : null,
+        district: property.area?.nameKa || '', // For backward compatibility
         photos: property.photos?.sort((a, b) => a.sortOrder - b.sortOrder)?.map(photo => photo.filePath) || []
       }
     });
@@ -847,6 +864,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
       order: { createdAt: 'DESC' },
       relations: [
         'city',
+        'area',
         'features',
         'advantages',
         'furnitureAppliances',
@@ -975,7 +993,7 @@ export const updateProperty = async (req: AuthenticatedRequest, res: Response): 
     if (propertyData.contactPhone !== undefined) property.contactPhone = propertyData.contactPhone;
     
     // Optional location fields
-    if (propertyData.district !== undefined) property.district = propertyData.district;
+    if (propertyData.areaId !== undefined) property.areaId = propertyData.areaId;
     if (propertyData.streetNumber !== undefined) property.streetNumber = propertyData.streetNumber;
     if (propertyData.postalCode !== undefined) property.postalCode = propertyData.postalCode;
     if (propertyData.cadastralCode !== undefined) property.cadastralCode = propertyData.cadastralCode;

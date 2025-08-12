@@ -73,12 +73,12 @@ export const getDistrictById = async (req: AuthenticatedRequest, res: Response):
 
 export const createDistrict = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { nameKa, nameEn, description, pricePerSqm } = req.body;
+    const { nameKa, nameEn, nameRu, description, pricePerSqm } = req.body;
     
-    if (!nameKa || !nameEn || !pricePerSqm) {
+    if (!nameKa || !nameEn || !nameRu || !pricePerSqm) {
       res.status(400).json({
         success: false,
-        message: 'Georgian name, English name, and price per square meter are required'
+        message: 'Georgian name, English name, Russian name, and price per square meter are required'
       });
       return;
     }
@@ -90,7 +90,8 @@ export const createDistrict = async (req: AuthenticatedRequest, res: Response): 
     const existingDistrict = await districtRepository.findOne({
       where: [
         { nameKa },
-        { nameEn }
+        { nameEn },
+        { nameRu }
       ]
     });
     
@@ -105,6 +106,7 @@ export const createDistrict = async (req: AuthenticatedRequest, res: Response): 
     const district = districtRepository.create({
       nameKa,
       nameEn,
+      nameRu,
       description,
       isActive: true
     });
@@ -141,7 +143,7 @@ export const createDistrict = async (req: AuthenticatedRequest, res: Response): 
 export const updateDistrict = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { nameKa, nameEn, description, isActive, pricePerSqm } = req.body;
+    const { nameKa, nameEn, nameRu, description, isActive, pricePerSqm } = req.body;
     
     const districtRepository = AppDataSource.getRepository(District);
     const priceStatisticRepository = AppDataSource.getRepository(PriceStatistic);
@@ -159,11 +161,12 @@ export const updateDistrict = async (req: AuthenticatedRequest, res: Response): 
     }
     
     // Check if another district with same name exists
-    if (nameKa || nameEn) {
+    if (nameKa || nameEn || nameRu) {
       const existingDistrict = await districtRepository.findOne({
         where: [
           { nameKa: nameKa || district.nameKa, id: Not(Number(id)) },
-          { nameEn: nameEn || district.nameEn, id: Not(Number(id)) }
+          { nameEn: nameEn || district.nameEn, id: Not(Number(id)) },
+          { nameRu: nameRu || district.nameRu, id: Not(Number(id)) }
         ]
       });
       
@@ -178,6 +181,7 @@ export const updateDistrict = async (req: AuthenticatedRequest, res: Response): 
     
     district.nameKa = nameKa || district.nameKa;
     district.nameEn = nameEn || district.nameEn;
+    district.nameRu = nameRu || district.nameRu;
     district.description = description !== undefined ? description : district.description;
     district.isActive = isActive !== undefined ? isActive : district.isActive;
     
