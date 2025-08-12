@@ -647,15 +647,24 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
 
     
     // Price range
-    if (minPrice) queryBuilder.andWhere('property.totalPrice >= :minPrice', { minPrice: Number(minPrice) });
-    if (maxPrice) queryBuilder.andWhere('property.totalPrice <= :maxPrice', { maxPrice: Number(maxPrice) });
+    if (minPrice && maxPrice) {
+      where.totalPrice = Between(Number(minPrice), Number(maxPrice));
+    } else if (minPrice) {
+      where.totalPrice = MoreThanOrEqual(Number(minPrice));
+    } else if (maxPrice) {
+      where.totalPrice = LessThanOrEqual(Number(maxPrice));
+    }
     
     // Area range
-    if (minArea) queryBuilder.andWhere('property.area >= :minArea', { minArea: Number(minArea) });
-    if (maxArea) queryBuilder.andWhere('property.area <= :maxArea', { maxArea: Number(maxArea) });
+    if (minArea && maxArea) {
+      where.area = Between(Number(minArea), Number(maxArea));
+    } else if (minArea) {
+      where.area = MoreThanOrEqual(Number(minArea));
+    } else if (maxArea) {
+      where.area = LessThanOrEqual(Number(maxArea));
+    }
     
     // Property details
-
     if (rooms) where.rooms = rooms;
     if (bedrooms) where.bedrooms = bedrooms;
     if (bathrooms) where.bathrooms = bathrooms;
@@ -671,77 +680,91 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         isFeatured: 'DESC',
         createdAt: 'DESC' 
       },
-      relations: [
-        'user', 
-        'city',
-        'area',
-        'features',
-        'advantages',
-        'furnitureAppliances',
-        'tags',
-        'photos'
-      ]
+      relations: ['user', 'city'],
+      select: {
+        id: true,
+        uuid: true,
+        title: true,
+        propertyType: true,
+        dealType: true,
+        area: true,
+        totalPrice: true,
+        pricePerSqm: true,
+        currency: true,
+        rooms: true,
+        bedrooms: true,
+        bathrooms: true,
+        isFeatured: true,
+        createdAt: true,
+        user: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true
+        },
+        city: {
+          id: true,
+          code: true,
+          nameGeorgian: true,
+          nameEnglish: true
+        }
+      }
     };
 
+    const [properties, total] = await propertyRepository.findAndCount(options);
     
-    // Featured filter
-    if (isFeatured === 'true') queryBuilder.andWhere('property.isFeatured = true');
+    // Get property IDs for batch photo query
+    const propertyIds = properties.map(p => p.id);
     
-    // Ordering and pagination
-    queryBuilder
-      .orderBy('property.isFeatured', 'DESC')
-      .addOrderBy('property.createdAt', 'DESC')
-      .skip((Number(page) - 1) * Number(limit))
-      .take(Number(limit));
+    // Load primary photos for all properties in one query
+    const primaryPhotos = await AppDataSource.getRepository('PropertyPhoto')
+      .find({
+        where: { 
+          propertyId: In(propertyIds), 
+          isPrimary: true 
+        },
+        select: ['propertyId', 'filePath']
+      });
     
-    const [properties, total] = await queryBuilder.getManyAndCount();
+    // Create a map for quick lookup
+    const photoMap = new Map(primaryPhotos.map(photo => [photo.propertyId, photo.filePath]));
     
-    // Load only primary photo for each property
-    const propertiesWithPhotos = await Promise.all(
-      properties.map(async (property) => {
-        const primaryPhoto = await AppDataSource.getRepository('PropertyPhoto')
-          .findOne({
-            where: { propertyId: property.id, isPrimary: true },
-            select: ['filePath']
-          });
-        
-        return {
-          id: property.id,
-          uuid: property.uuid,
-          title: property.title,
-          propertyType: property.propertyType,
-          dealType: property.dealType,
-          area: property.area,
-          totalPrice: property.totalPrice,
-          pricePerSqm: property.pricePerSqm,
-          currency: property.currency,
-          rooms: property.rooms,
-          bedrooms: property.bedrooms,
-          bathrooms: property.bathrooms,
-          isFeatured: property.isFeatured,
-          createdAt: property.createdAt,
-          city: property.city?.nameEnglish || property.city?.nameGeorgian || '',
-          cityData: {
-            id: property.city?.id,
-            code: property.city?.code,
-            nameGeorgian: property.city?.nameGeorgian,
-            nameEnglish: property.city?.nameEnglish
-          },
-          user: {
-            id: property.user.id,
-            fullName: property.user.fullName,
-            email: property.user.email,
-            phone: property.user.phone
-          },
-          photos: primaryPhoto ? [primaryPhoto.filePath] : [],
-          // Empty arrays for list view - full data loaded on detail view
-          features: [],
-          advantages: [],
-          furnitureAppliances: [],
-          tags: []
-        };
-      })
-    );
+    // Build response without additional queries
+    const propertiesWithPhotos = properties.map(property => ({
+      id: property.id,
+      uuid: property.uuid,
+      title: property.title,
+      propertyType: property.propertyType,
+      dealType: property.dealType,
+      area: property.area,
+      totalPrice: property.totalPrice,
+      pricePerSqm: property.pricePerSqm,
+      currency: property.currency,
+      rooms: property.rooms,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms,
+      isFeatured: property.isFeatured,
+      createdAt: property.createdAt,
+      city: property.city?.nameEnglish || property.city?.nameGeorgian || '',
+      cityData: {
+        id: property.city?.id,
+        code: property.city?.code,
+        nameGeorgian: property.city?.nameGeorgian,
+        nameEnglish: property.city?.nameEnglish
+      },
+      user: {
+        id: property.user.id,
+        fullName: property.user.fullName,
+        email: property.user.email,
+        phone: property.user.phone
+      },
+      photos: photoMap.get(property.id) ? [photoMap.get(property.id)] : [],
+      // Empty arrays for list view - full data loaded on detail view
+      features: [],
+      advantages: [],
+      furnitureAppliances: [],
+      tags: []
+    }));
     
     res.status(200).json({
       success: true,
