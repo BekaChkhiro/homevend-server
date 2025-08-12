@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { IUser } from './user.js';
+import { UserRoleEnum } from '../models/User.js';
 
 export interface AuthenticatedRequest extends Request {
   user?: IUser;
@@ -8,7 +9,7 @@ export interface AuthenticatedRequest extends Request {
 export interface JWTPayload {
   userId: number;
   email: string;
-  role: 'user' | 'admin';
+  role: UserRoleEnum;
 }
 
 export interface LoginResponse {
@@ -16,7 +17,7 @@ export interface LoginResponse {
     id: number;
     fullName: string;
     email: string;
-    role: 'user' | 'admin';
+    role: UserRoleEnum;
   };
   token: string;
   refreshToken?: string;

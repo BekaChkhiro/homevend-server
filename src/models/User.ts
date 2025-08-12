@@ -9,18 +9,19 @@ import {
 } from 'typeorm';
 import bcrypt from 'bcrypt';
 
+export enum UserRoleEnum {
+  USER = 'user',
+  AGENT = 'agent',
+  ADMIN = 'admin'
+}
+
 @Entity('users')
-@Index('IDX_USER_EMAIL', ['email'], { unique: true })
 export class User {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({
-    type: 'varchar',
-    length: 100,
-    nullable: false
-  })
-  fullName!: string;
+  @Column({ type: 'uuid', unique: true, generated: 'uuid' })
+  uuid!: string;
 
   @Column({
     type: 'varchar',
@@ -31,6 +32,7 @@ export class User {
   email!: string;
 
   @Column({
+    name: 'password_hash',
     type: 'varchar',
     length: 255,
     nullable: false
@@ -38,16 +40,43 @@ export class User {
   password!: string;
 
   @Column({
-    type: 'enum',
-    enum: ['user', 'admin'],
-    default: 'user'
+    name: 'full_name',
+    type: 'varchar',
+    length: 200,
+    nullable: false
   })
-  role!: 'user' | 'admin';
+  fullName!: string;
 
-  @CreateDateColumn()
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true
+  })
+  phone?: string;
+
+  @Column({
+    type: 'enum',
+    enum: UserRoleEnum,
+    default: UserRoleEnum.USER
+  })
+  role!: UserRoleEnum;
+
+  @Column({ name: 'is_verified', type: 'boolean', default: false })
+  isVerified!: boolean;
+
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive!: boolean;
+
+  @Column({ name: 'profile_image_url', type: 'text', nullable: true })
+  profileImageUrl?: string;
+
+  @Column({ name: 'last_login_at', type: 'timestamp with time zone', nullable: true })
+  lastLoginAt?: Date;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp with time zone' })
   updatedAt!: Date;
 
   @BeforeInsert()

@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AppDataSource } from '../config/database.js';
-import { User } from '../models/User.js';
+import { User, UserRoleEnum } from '../models/User.js';
 import { Property } from '../models/Property.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 
@@ -186,15 +186,11 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
     const [
       totalUsers,
       totalAdmins,
-      totalProperties,
-      pendingProperties,
-      activeProperties
+      totalProperties
     ] = await Promise.all([
-      userRepository.count({ where: { role: 'user' } }),
-      userRepository.count({ where: { role: 'admin' } }),
-      propertyRepository.count(),
-      propertyRepository.count({ where: { status: 'pending' } }),
-      propertyRepository.count({ where: { status: 'active' } })
+      userRepository.count({ where: { role: UserRoleEnum.USER } }),
+      userRepository.count({ where: { role: UserRoleEnum.ADMIN } }),
+      propertyRepository.count()
     ]);
     
     const recentUsers = await userRepository.find({
@@ -207,7 +203,7 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
       take: 5,
       order: { createdAt: 'DESC' },
       relations: ['user'],
-      select: ['id', 'propertyType', 'city', 'totalPrice', 'status', 'createdAt']
+      select: ['id', 'propertyType', 'city', 'totalPrice', 'createdAt']
     });
     
     res.status(200).json({
@@ -216,9 +212,7 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
         stats: {
           totalUsers,
           totalAdmins,
-          totalProperties,
-          pendingProperties,
-          activeProperties
+          totalProperties
         },
         recentUsers,
         recentProperties: recentProperties.map(p => ({
