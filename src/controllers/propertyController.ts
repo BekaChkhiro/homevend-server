@@ -634,7 +634,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     } = req.query;
     
     const propertyRepository = AppDataSource.getRepository(Property);
-    
+
     const where: any = {};
     
     // Location filters
@@ -644,26 +644,18 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     // Basic filters
     if (propertyType) where.propertyType = propertyType;
     if (dealType) where.dealType = dealType;
+
     
     // Price range
-    if (minPrice && maxPrice) {
-      where.totalPrice = Between(Number(minPrice), Number(maxPrice));
-    } else if (minPrice) {
-      where.totalPrice = MoreThanOrEqual(Number(minPrice));
-    } else if (maxPrice) {
-      where.totalPrice = LessThanOrEqual(Number(maxPrice));
-    }
-
+    if (minPrice) queryBuilder.andWhere('property.totalPrice >= :minPrice', { minPrice: Number(minPrice) });
+    if (maxPrice) queryBuilder.andWhere('property.totalPrice <= :maxPrice', { maxPrice: Number(maxPrice) });
+    
     // Area range
-    if (minArea && maxArea) {
-      where.area = Between(Number(minArea), Number(maxArea));
-    } else if (minArea) {
-      where.area = MoreThanOrEqual(Number(minArea));
-    } else if (maxArea) {
-      where.area = LessThanOrEqual(Number(maxArea));
-    }
-
+    if (minArea) queryBuilder.andWhere('property.area >= :minArea', { minArea: Number(minArea) });
+    if (maxArea) queryBuilder.andWhere('property.area <= :maxArea', { maxArea: Number(maxArea) });
+    
     // Property details
+
     if (rooms) where.rooms = rooms;
     if (bedrooms) where.bedrooms = bedrooms;
     if (bathrooms) where.bathrooms = bathrooms;
@@ -690,34 +682,71 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         'photos'
       ]
     };
+
     
-    const [properties, total] = await propertyRepository.findAndCount(options);
+    // Featured filter
+    if (isFeatured === 'true') queryBuilder.andWhere('property.isFeatured = true');
+    
+    // Ordering and pagination
+    queryBuilder
+      .orderBy('property.isFeatured', 'DESC')
+      .addOrderBy('property.createdAt', 'DESC')
+      .skip((Number(page) - 1) * Number(limit))
+      .take(Number(limit));
+    
+    const [properties, total] = await queryBuilder.getManyAndCount();
+    
+    // Load only primary photo for each property
+    const propertiesWithPhotos = await Promise.all(
+      properties.map(async (property) => {
+        const primaryPhoto = await AppDataSource.getRepository('PropertyPhoto')
+          .findOne({
+            where: { propertyId: property.id, isPrimary: true },
+            select: ['filePath']
+          });
+        
+        return {
+          id: property.id,
+          uuid: property.uuid,
+          title: property.title,
+          propertyType: property.propertyType,
+          dealType: property.dealType,
+          area: property.area,
+          totalPrice: property.totalPrice,
+          pricePerSqm: property.pricePerSqm,
+          currency: property.currency,
+          rooms: property.rooms,
+          bedrooms: property.bedrooms,
+          bathrooms: property.bathrooms,
+          isFeatured: property.isFeatured,
+          createdAt: property.createdAt,
+          city: property.city?.nameEnglish || property.city?.nameGeorgian || '',
+          cityData: {
+            id: property.city?.id,
+            code: property.city?.code,
+            nameGeorgian: property.city?.nameGeorgian,
+            nameEnglish: property.city?.nameEnglish
+          },
+          user: {
+            id: property.user.id,
+            fullName: property.user.fullName,
+            email: property.user.email,
+            phone: property.user.phone
+          },
+          photos: primaryPhoto ? [primaryPhoto.filePath] : [],
+          // Empty arrays for list view - full data loaded on detail view
+          features: [],
+          advantages: [],
+          furnitureAppliances: [],
+          tags: []
+        };
+      })
+    );
     
     res.status(200).json({
       success: true,
       data: {
-        properties: properties.map(p => ({
-          ...p,
-          // Maintain backward compatibility with frontend
-          features: p.features?.map(f => f.nameEnglish || f.code) || [],
-          advantages: p.advantages?.map(a => a.nameEnglish || a.code) || [],
-          furnitureAppliances: p.furnitureAppliances?.map(fa => fa.nameEnglish || fa.code) || [],
-          tags: p.tags?.map(t => t.nameEnglish || t.code) || [],
-          city: p.city?.nameEnglish || p.city?.nameGeorgian || '',
-          user: { 
-            id: p.user.id, 
-            fullName: p.user.fullName, 
-            email: p.user.email,
-            phone: p.user.phone 
-          },
-          cityData: {
-            id: p.city?.id,
-            code: p.city?.code,
-            nameGeorgian: p.city?.nameGeorgian,
-            nameEnglish: p.city?.nameEnglish
-          },
-          photos: p.photos?.sort((a, b) => a.sortOrder - b.sortOrder)?.map(photo => photo.filePath) || []
-        })),
+        properties: propertiesWithPhotos,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -859,6 +888,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
     const userId = req.user!.id;
     const propertyRepository = AppDataSource.getRepository(Property);
     
+
     const properties = await propertyRepository.find({
       where: { userId },
       order: { createdAt: 'DESC' },
@@ -872,16 +902,26 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
         'photos'
       ]
     });
+
     
     res.status(200).json({
       success: true,
       data: properties.map(p => ({
-        ...p,
-        // Maintain backward compatibility with frontend
-        features: p.features?.map(f => f.nameEnglish || f.code) || [],
-        advantages: p.advantages?.map(a => a.nameEnglish || a.code) || [],
-        furnitureAppliances: p.furnitureAppliances?.map(fa => fa.nameEnglish || fa.code) || [],
-        tags: p.tags?.map(t => t.nameEnglish || t.code) || [],
+        id: p.id,
+        uuid: p.uuid,
+        title: p.title,
+        propertyType: p.propertyType,
+        dealType: p.dealType,
+        area: p.area,
+        totalPrice: p.totalPrice,
+        pricePerSqm: p.pricePerSqm,
+        currency: p.currency,
+        rooms: p.rooms,
+        bedrooms: p.bedrooms,
+        bathrooms: p.bathrooms,
+        isFeatured: p.isFeatured,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
         city: p.city?.nameEnglish || p.city?.nameGeorgian || '',
         cityData: {
           id: p.city?.id,
@@ -889,7 +929,12 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
           nameGeorgian: p.city?.nameGeorgian,
           nameEnglish: p.city?.nameEnglish
         },
-        photos: p.photos?.sort((a, b) => a.sortOrder - b.sortOrder)?.map(photo => photo.filePath) || []
+        photos: p.photos ? p.photos.map(photo => photo.filePath) : [],
+        // Empty arrays - full data only when needed
+        features: [],
+        advantages: [],
+        furnitureAppliances: [],
+        tags: []
       }))
     });
   } catch (error) {

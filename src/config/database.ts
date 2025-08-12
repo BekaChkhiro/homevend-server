@@ -36,7 +36,7 @@ const dbConfig = process.env.DATABASE_URL ? {
 export const AppDataSource = new DataSource({
   ...dbConfig,
   synchronize: false, // Always use migrations instead
-  logging: process.env.NODE_ENV === 'development',
+  logging: false,
   entities: [
     User, 
     Property, 
