@@ -21,7 +21,7 @@ const dbConfig = process.env.DATABASE_URL ? {
 export default new DataSource({
   ...dbConfig,
   synchronize: false,
-  logging: true,
+  logging: false,
   entities: ['src/models/*.ts'],
   migrations: ['src/migrations/*.ts'],
   subscribers: ['src/subscribers/*.ts']

@@ -628,88 +628,96 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     
     const propertyRepository = AppDataSource.getRepository(Property);
     
-    const where: any = {};
+    // Build query with only needed joins
+    const queryBuilder = propertyRepository
+      .createQueryBuilder('property')
+      .leftJoinAndSelect('property.city', 'city')
+      .leftJoinAndSelect('property.user', 'user')
+      .leftJoin('property.photos', 'photos', 'photos.isPrimary = true')
+      .addSelect(['photos.filePath']);
     
-    // Location filters
-    if (cityId) where.cityId = cityId;
-    if (district) where.district = Like(`%${district}%`);
-    
-    // Basic filters
-    if (propertyType) where.propertyType = propertyType;
-    if (dealType) where.dealType = dealType;
+    // Add conditional filters
+    if (cityId) queryBuilder.andWhere('property.cityId = :cityId', { cityId });
+    if (district) queryBuilder.andWhere('property.district ILIKE :district', { district: `%${district}%` });
+    if (propertyType) queryBuilder.andWhere('property.propertyType = :propertyType', { propertyType });
+    if (dealType) queryBuilder.andWhere('property.dealType = :dealType', { dealType });
     
     // Price range
-    if (minPrice && maxPrice) {
-      where.totalPrice = Between(Number(minPrice), Number(maxPrice));
-    } else if (minPrice) {
-      where.totalPrice = MoreThanOrEqual(Number(minPrice));
-    } else if (maxPrice) {
-      where.totalPrice = LessThanOrEqual(Number(maxPrice));
-    }
-
+    if (minPrice) queryBuilder.andWhere('property.totalPrice >= :minPrice', { minPrice: Number(minPrice) });
+    if (maxPrice) queryBuilder.andWhere('property.totalPrice <= :maxPrice', { maxPrice: Number(maxPrice) });
+    
     // Area range
-    if (minArea && maxArea) {
-      where.area = Between(Number(minArea), Number(maxArea));
-    } else if (minArea) {
-      where.area = MoreThanOrEqual(Number(minArea));
-    } else if (maxArea) {
-      where.area = LessThanOrEqual(Number(maxArea));
-    }
-
+    if (minArea) queryBuilder.andWhere('property.area >= :minArea', { minArea: Number(minArea) });
+    if (maxArea) queryBuilder.andWhere('property.area <= :maxArea', { maxArea: Number(maxArea) });
+    
     // Property details
-    if (rooms) where.rooms = rooms;
-    if (bedrooms) where.bedrooms = bedrooms;
-    if (bathrooms) where.bathrooms = bathrooms;
-
+    if (rooms) queryBuilder.andWhere('property.rooms = :rooms', { rooms });
+    if (bedrooms) queryBuilder.andWhere('property.bedrooms = :bedrooms', { bedrooms });
+    if (bathrooms) queryBuilder.andWhere('property.bathrooms = :bathrooms', { bathrooms });
+    
     // Featured filter
-    if (isFeatured === 'true') where.isFeatured = true;
+    if (isFeatured === 'true') queryBuilder.andWhere('property.isFeatured = true');
     
-    const options: FindManyOptions<Property> = {
-      where,
-      take: Number(limit),
-      skip: (Number(page) - 1) * Number(limit),
-      order: { 
-        isFeatured: 'DESC',
-        createdAt: 'DESC' 
-      },
-      relations: [
-        'user', 
-        'city',
-        'features',
-        'advantages',
-        'furnitureAppliances',
-        'tags',
-        'photos'
-      ]
-    };
+    // Ordering and pagination
+    queryBuilder
+      .orderBy('property.isFeatured', 'DESC')
+      .addOrderBy('property.createdAt', 'DESC')
+      .skip((Number(page) - 1) * Number(limit))
+      .take(Number(limit));
     
-    const [properties, total] = await propertyRepository.findAndCount(options);
+    const [properties, total] = await queryBuilder.getManyAndCount();
+    
+    // Load only primary photo for each property
+    const propertiesWithPhotos = await Promise.all(
+      properties.map(async (property) => {
+        const primaryPhoto = await AppDataSource.getRepository('PropertyPhoto')
+          .findOne({
+            where: { propertyId: property.id, isPrimary: true },
+            select: ['filePath']
+          });
+        
+        return {
+          id: property.id,
+          uuid: property.uuid,
+          title: property.title,
+          propertyType: property.propertyType,
+          dealType: property.dealType,
+          area: property.area,
+          totalPrice: property.totalPrice,
+          pricePerSqm: property.pricePerSqm,
+          currency: property.currency,
+          rooms: property.rooms,
+          bedrooms: property.bedrooms,
+          bathrooms: property.bathrooms,
+          isFeatured: property.isFeatured,
+          createdAt: property.createdAt,
+          city: property.city?.nameEnglish || property.city?.nameGeorgian || '',
+          cityData: {
+            id: property.city?.id,
+            code: property.city?.code,
+            nameGeorgian: property.city?.nameGeorgian,
+            nameEnglish: property.city?.nameEnglish
+          },
+          user: {
+            id: property.user.id,
+            fullName: property.user.fullName,
+            email: property.user.email,
+            phone: property.user.phone
+          },
+          photos: primaryPhoto ? [primaryPhoto.filePath] : [],
+          // Empty arrays for list view - full data loaded on detail view
+          features: [],
+          advantages: [],
+          furnitureAppliances: [],
+          tags: []
+        };
+      })
+    );
     
     res.status(200).json({
       success: true,
       data: {
-        properties: properties.map(p => ({
-          ...p,
-          // Maintain backward compatibility with frontend
-          features: p.features?.map(f => f.nameEnglish || f.code) || [],
-          advantages: p.advantages?.map(a => a.nameEnglish || a.code) || [],
-          furnitureAppliances: p.furnitureAppliances?.map(fa => fa.nameEnglish || fa.code) || [],
-          tags: p.tags?.map(t => t.nameEnglish || t.code) || [],
-          city: p.city?.nameEnglish || p.city?.nameGeorgian || '',
-          user: { 
-            id: p.user.id, 
-            fullName: p.user.fullName, 
-            email: p.user.email,
-            phone: p.user.phone 
-          },
-          cityData: {
-            id: p.city?.id,
-            code: p.city?.code,
-            nameGeorgian: p.city?.nameGeorgian,
-            nameEnglish: p.city?.nameEnglish
-          },
-          photos: p.photos?.sort((a, b) => a.sortOrder - b.sortOrder)?.map(photo => photo.filePath) || []
-        })),
+        properties: propertiesWithPhotos,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -842,28 +850,34 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
     const userId = req.user!.id;
     const propertyRepository = AppDataSource.getRepository(Property);
     
-    const properties = await propertyRepository.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-      relations: [
-        'city',
-        'features',
-        'advantages',
-        'furnitureAppliances',
-        'tags',
-        'photos'
-      ]
-    });
+    // Optimized query with only essential data
+    const properties = await propertyRepository
+      .createQueryBuilder('property')
+      .leftJoinAndSelect('property.city', 'city')
+      .leftJoin('property.photos', 'photos', 'photos.isPrimary = true')
+      .addSelect(['photos.filePath'])
+      .where('property.userId = :userId', { userId })
+      .orderBy('property.createdAt', 'DESC')
+      .getMany();
     
     res.status(200).json({
       success: true,
       data: properties.map(p => ({
-        ...p,
-        // Maintain backward compatibility with frontend
-        features: p.features?.map(f => f.nameEnglish || f.code) || [],
-        advantages: p.advantages?.map(a => a.nameEnglish || a.code) || [],
-        furnitureAppliances: p.furnitureAppliances?.map(fa => fa.nameEnglish || fa.code) || [],
-        tags: p.tags?.map(t => t.nameEnglish || t.code) || [],
+        id: p.id,
+        uuid: p.uuid,
+        title: p.title,
+        propertyType: p.propertyType,
+        dealType: p.dealType,
+        area: p.area,
+        totalPrice: p.totalPrice,
+        pricePerSqm: p.pricePerSqm,
+        currency: p.currency,
+        rooms: p.rooms,
+        bedrooms: p.bedrooms,
+        bathrooms: p.bathrooms,
+        isFeatured: p.isFeatured,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
         city: p.city?.nameEnglish || p.city?.nameGeorgian || '',
         cityData: {
           id: p.city?.id,
@@ -871,7 +885,12 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
           nameGeorgian: p.city?.nameGeorgian,
           nameEnglish: p.city?.nameEnglish
         },
-        photos: p.photos?.sort((a, b) => a.sortOrder - b.sortOrder)?.map(photo => photo.filePath) || []
+        photos: p.photos ? p.photos.map(photo => photo.filePath) : [],
+        // Empty arrays - full data only when needed
+        features: [],
+        advantages: [],
+        furnitureAppliances: [],
+        tags: []
       }))
     });
   } catch (error) {
