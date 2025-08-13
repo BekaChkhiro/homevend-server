@@ -51,6 +51,16 @@ export class District {
   description?: string;
 
   @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: false,
+    default: 0,
+    name: 'price_per_sqm'
+  })
+  pricePerSqm!: number;
+
+  @Column({
     type: 'boolean',
     default: true,
     name: 'is_active'

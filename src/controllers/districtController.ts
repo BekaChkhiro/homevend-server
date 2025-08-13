@@ -2,7 +2,6 @@ import { Response } from 'express';
 import { Not } from 'typeorm';
 import { AppDataSource } from '../config/database.js';
 import { District } from '../models/District.js';
-import { PriceStatistic } from '../models/PriceStatistic.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 
 export const getAllDistricts = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -11,25 +10,12 @@ export const getAllDistricts = async (req: AuthenticatedRequest, res: Response):
     
     const districts = await districtRepository.find({
       where: { isActive: true },
-      order: { nameKa: 'ASC' },
-      relations: ['priceStatistics']
-    });
-    
-    // Add current price to each district
-    const districtsWithPrices = districts.map(district => {
-      const generalPrice = district.priceStatistics?.find(
-        stat => stat.propertyType === 'general' && stat.dealType === 'sale' && stat.isActive
-      );
-      
-      return {
-        ...district,
-        currentPricePerSqm: generalPrice?.averagePricePerSqm || null
-      };
+      order: { nameKa: 'ASC' }
     });
     
     res.status(200).json({
       success: true,
-      data: districtsWithPrices
+      data: districts
     });
   } catch (error) {
     console.error('Get districts error:', error);
@@ -46,8 +32,7 @@ export const getDistrictById = async (req: AuthenticatedRequest, res: Response):
     const districtRepository = AppDataSource.getRepository(District);
     
     const district = await districtRepository.findOne({
-      where: { id: Number(id) },
-      relations: ['priceStatistics']
+      where: { id: Number(id) }
     });
     
     if (!district) {
@@ -75,23 +60,22 @@ export const createDistrict = async (req: AuthenticatedRequest, res: Response): 
   try {
     const { nameKa, nameEn, nameRu, description, pricePerSqm } = req.body;
     
-    if (!nameKa || !nameEn || !nameRu || !pricePerSqm) {
+    if (!nameKa || !nameEn || pricePerSqm === undefined) {
       res.status(400).json({
         success: false,
-        message: 'Georgian name, English name, Russian name, and price per square meter are required'
+        message: 'Georgian name, English name, and price per square meter are required'
       });
       return;
     }
     
     const districtRepository = AppDataSource.getRepository(District);
-    const priceStatisticRepository = AppDataSource.getRepository(PriceStatistic);
     
     // Check if district with same name already exists
     const existingDistrict = await districtRepository.findOne({
       where: [
         { nameKa },
         { nameEn },
-        { nameRu }
+        { nameRu: nameRu || '' }
       ]
     });
     
@@ -106,25 +90,13 @@ export const createDistrict = async (req: AuthenticatedRequest, res: Response): 
     const district = districtRepository.create({
       nameKa,
       nameEn,
-      nameRu,
+      nameRu: nameRu || nameEn,
       description,
+      pricePerSqm: Number(pricePerSqm),
       isActive: true
     });
     
     await districtRepository.save(district);
-    
-    // Create default price statistic for the district
-    const priceStatistic = priceStatisticRepository.create({
-      districtId: district.id,
-      propertyType: 'general',
-      dealType: 'sale',
-      averagePricePerSqm: Number(pricePerSqm),
-      currency: 'USD',
-      sampleSize: 0,
-      isActive: true
-    });
-    
-    await priceStatisticRepository.save(priceStatistic);
     
     res.status(201).json({
       success: true,
@@ -146,7 +118,6 @@ export const updateDistrict = async (req: AuthenticatedRequest, res: Response): 
     const { nameKa, nameEn, nameRu, description, isActive, pricePerSqm } = req.body;
     
     const districtRepository = AppDataSource.getRepository(District);
-    const priceStatisticRepository = AppDataSource.getRepository(PriceStatistic);
     
     const district = await districtRepository.findOne({
       where: { id: Number(id) }
@@ -184,36 +155,9 @@ export const updateDistrict = async (req: AuthenticatedRequest, res: Response): 
     district.nameRu = nameRu || district.nameRu;
     district.description = description !== undefined ? description : district.description;
     district.isActive = isActive !== undefined ? isActive : district.isActive;
+    district.pricePerSqm = pricePerSqm !== undefined ? Number(pricePerSqm) : district.pricePerSqm;
     
     await districtRepository.save(district);
-    
-    // Update price statistic if provided
-    if (pricePerSqm) {
-      let priceStatistic = await priceStatisticRepository.findOne({
-        where: { 
-          districtId: Number(id), 
-          propertyType: 'general',
-          dealType: 'sale'
-        }
-      });
-      
-      if (priceStatistic) {
-        priceStatistic.averagePricePerSqm = Number(pricePerSqm);
-        await priceStatisticRepository.save(priceStatistic);
-      } else {
-        // Create new price statistic if it doesn't exist
-        priceStatistic = priceStatisticRepository.create({
-          districtId: Number(id),
-          propertyType: 'general',
-          dealType: 'sale',
-          averagePricePerSqm: Number(pricePerSqm),
-          currency: 'USD',
-          sampleSize: 0,
-          isActive: true
-        });
-        await priceStatisticRepository.save(priceStatistic);
-      }
-    }
     
     res.status(200).json({
       success: true,
@@ -233,7 +177,6 @@ export const deleteDistrict = async (req: AuthenticatedRequest, res: Response): 
   try {
     const { id } = req.params;
     const districtRepository = AppDataSource.getRepository(District);
-    const priceStatisticRepository = AppDataSource.getRepository(PriceStatistic);
     
     const district = await districtRepository.findOne({
       where: { id: Number(id) }
@@ -243,19 +186,6 @@ export const deleteDistrict = async (req: AuthenticatedRequest, res: Response): 
       res.status(404).json({
         success: false,
         message: 'District not found'
-      });
-      return;
-    }
-    
-    // Check if district has price statistics
-    const priceStatisticsCount = await priceStatisticRepository.count({
-      where: { districtId: Number(id) }
-    });
-    
-    if (priceStatisticsCount > 0) {
-      res.status(400).json({
-        success: false,
-        message: 'Cannot delete district with existing price statistics'
       });
       return;
     }
