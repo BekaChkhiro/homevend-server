@@ -29,6 +29,7 @@ export class SeedGeorgianCities1754590000000 implements MigrationInterface {
             ('khashuri', 'ხაშური', 'Khashuri', 'Shida Kartli', true),
             ('mtskheta', 'მცხეთა', 'Mtskheta', 'Mtskheta-Mtianeti', true),
             ('gudauri', 'გუდაური', 'Gudauri', 'Mtskheta-Mtianeti', true),
+            ('bakuriani', 'ბაკურიანი', 'Bakuriani', 'Samtskhe-Javakheti', true),
             ('sighnaghi', 'სიღნაღი', 'Sighnaghi', 'Kakheti', true),
             ('mestia', 'მესტია', 'Mestia', 'Samegrelo-Zemo Svaneti', true),
             ('akhmeta', 'ახმეტა', 'Akhmeta', 'Kakheti', true)
@@ -44,7 +45,7 @@ export class SeedGeorgianCities1754590000000 implements MigrationInterface {
                 'tbilisi', 'batumi', 'kutaisi', 'rustavi', 'gori', 'zugdidi', 'poti', 
                 'kobuleti', 'telavi', 'akhaltsikhe', 'ozurgeti', 'kaspi', 'marneuli', 
                 'gardabani', 'borjomi', 'akhalkalaki', 'senaki', 'zestaponi', 
-                'samtredia', 'khashuri', 'mtskheta', 'gudauri', 'sighnaghi', 'mestia', 'akhmeta'
+                'samtredia', 'khashuri', 'mtskheta', 'gudauri', 'bakuriani', 'sighnaghi', 'mestia', 'akhmeta'
             )
         `);
 
