@@ -12,12 +12,6 @@ import { FindManyOptions, Like, ILike, In, Between, MoreThanOrEqual, LessThanOrE
 
 export const createProperty = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    console.log('🔥 =================================');
-    console.log('📨 Property creation request received');
-    console.log('👤 User ID:', req.userId);
-    console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
-    console.log('🔥 =================================');
-    
     const propertyRepository = AppDataSource.getRepository(Property);
     const cityRepository = AppDataSource.getRepository(City);
     const featureRepository = AppDataSource.getRepository(Feature);
@@ -330,7 +324,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
 
     // Calculate price per sqm if not provided
     if (!property.pricePerSqm && property.totalPrice && property.area) {
-      property.pricePerSqm = property.totalPrice / property.area;
+      property.pricePerSqm = Number(property.totalPrice) / Number(property.area);
     }
 
     const savedProperty = await propertyRepository.save(property);
@@ -970,7 +964,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
 };
 
 export const updateProperty = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
+  try {    
     const { id } = req.params;
     const propertyRepository = AppDataSource.getRepository(Property);
     
@@ -1138,7 +1132,7 @@ export const updateProperty = async (req: AuthenticatedRequest, res: Response): 
 
     // Calculate price per sqm if price or area changed
     if (property.totalPrice && property.area) {
-      property.pricePerSqm = property.totalPrice / property.area;
+      property.pricePerSqm = Number(property.totalPrice) / Number(property.area);
     }
 
     // Update related entities - support both IDs and names for backward compatibility
