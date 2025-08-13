@@ -1,4 +1,4 @@
-import { UserRoleEnum } from '../models/User.js';
+import { UserRoleEnum } from '../models/User';
 
 export interface IUser {
   id: number;

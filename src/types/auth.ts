@@ -1,6 +1,6 @@
 import { Request } from 'express';
-import { IUser } from './user.js';
-import { UserRoleEnum } from '../models/User.js';
+import { IUser } from './user';
+import { UserRoleEnum } from '../models/User';
 
 export interface AuthenticatedRequest extends Request {
   user?: IUser;
