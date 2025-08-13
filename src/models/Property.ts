@@ -278,7 +278,7 @@ export class Property {
 
   // Pricing
   @Column({ type: 'decimal', precision: 8, scale: 2, nullable: false })
-  area!: number;
+  totalArea!: number;
 
   @Column({ name: 'total_price', type: 'decimal', precision: 12, scale: 2, nullable: false })
   totalPrice!: number;
