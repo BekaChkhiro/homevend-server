@@ -72,6 +72,7 @@ export interface IProperty {
   title: string;
   propertyType: PropertyTypeEnum;
   dealType: DealTypeEnum;
+  dailyRentalSubcategory?: string;
   
   // Location
   cityId: number;
@@ -175,6 +176,7 @@ export interface CreatePropertyInput {
   title: string;
   propertyType: PropertyTypeEnum;
   dealType: DealTypeEnum;
+  dailyRentalSubcategory?: string;
   
   // Location
   cityId: number;

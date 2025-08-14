@@ -100,6 +100,9 @@ export class Property {
   })
   dealType!: DealTypeEnum;
 
+  @Column({ name: 'daily_rental_subcategory', type: 'varchar', length: 50, nullable: true })
+  dailyRentalSubcategory?: string;
+
   // Location
   @Column({ name: 'city_id', type: 'integer', nullable: false })
   cityId!: number;
@@ -113,7 +116,7 @@ export class Property {
 
   @ManyToOne(() => Area, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'area_id' })
-  area?: Area;
+  areaData?: Area;
 
   @Column({ type: 'varchar', length: 200, nullable: false })
   street!: string;

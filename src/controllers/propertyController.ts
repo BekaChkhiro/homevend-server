@@ -237,6 +237,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     property.title = propertyData.title;
     property.propertyType = propertyData.propertyType;
     property.dealType = propertyData.dealType;
+    if (propertyData.dailyRentalSubcategory) property.dailyRentalSubcategory = propertyData.dailyRentalSubcategory;
     property.street = propertyData.street;
     property.area = propertyData.area;
     property.totalPrice = propertyData.totalPrice;
@@ -244,7 +245,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     property.contactPhone = propertyData.contactPhone;
     
     // Optional location fields
-    if (propertyData.areaId) property.areaId = propertyData.areaId;
+    if (propertyData.areaId !== undefined) property.areaId = propertyData.areaId;
     if (propertyData.streetNumber) property.streetNumber = propertyData.streetNumber;
     if (propertyData.postalCode) property.postalCode = propertyData.postalCode;
     if (propertyData.cadastralCode) property.cadastralCode = propertyData.cadastralCode;
@@ -674,7 +675,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         isFeatured: 'DESC',
         createdAt: 'DESC' 
       },
-      relations: ['user', 'city'],
+      relations: ['user', 'city', 'areaData'],
       select: {
         id: true,
         uuid: true,
@@ -690,6 +691,8 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         bathrooms: true,
         isFeatured: true,
         createdAt: true,
+        street: true,
+        areaId: true,
         user: {
           id: true,
           fullName: true,
@@ -701,6 +704,12 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
           code: true,
           nameGeorgian: true,
           nameEnglish: true
+        },
+        areaData: {
+          id: true,
+          nameKa: true,
+          nameEn: true,
+          nameRu: true
         }
       }
     };
@@ -739,6 +748,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       bathrooms: property.bathrooms,
       isFeatured: property.isFeatured,
       createdAt: property.createdAt,
+      street: property.street,
       city: property.city?.nameEnglish || property.city?.nameGeorgian || '',
       cityData: {
         id: property.city?.id,
@@ -746,6 +756,13 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         nameGeorgian: property.city?.nameGeorgian,
         nameEnglish: property.city?.nameEnglish
       },
+      areaData: property.areaData ? {
+        id: property.areaData.id,
+        nameKa: property.areaData.nameKa,
+        nameEn: property.areaData.nameEn,
+        nameRu: property.areaData.nameRu
+      } : null,
+      district: property.areaData?.nameKa || '',
       user: {
         id: property.user.id,
         fullName: property.user.fullName,
@@ -796,12 +813,18 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
     
     const propertyRepository = AppDataSource.getRepository(Property);
     
+    // First get the property with numeric fields
+    const propertyWithNumbers = await propertyRepository.findOne({
+      where: { id: propertyId }
+    });
+    
+    // Then get the property with relationships
     const property = await propertyRepository.findOne({
       where: { id: propertyId },
       relations: [
         'user',
         'city',
-        'area', 
+        'areaData', 
         'features',
         'advantages',
         'furnitureAppliances',
@@ -854,6 +877,8 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
       success: true,
       data: {
         ...property,
+        // Fix naming conflict: use numeric area from query without relationships
+        area: propertyWithNumbers?.area,
         // Return codes for editing, display names for viewing
         features: isForEditing 
           ? property.features?.map(f => f.code) || []
@@ -880,14 +905,14 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
           nameGeorgian: property.city?.nameGeorgian,
           nameEnglish: property.city?.nameEnglish
         },
-        areaData: property.area ? {
-          id: property.area.id,
-          cityId: property.area.cityId,
-          nameKa: property.area.nameKa,
-          nameEn: property.area.nameEn,
-          nameRu: property.area.nameRu
+        areaData: property.areaData ? {
+          id: property.areaData.id,
+          cityId: property.areaData.cityId,
+          nameKa: property.areaData.nameKa,
+          nameEn: property.areaData.nameEn,
+          nameRu: property.areaData.nameRu
         } : null,
-        district: property.area?.nameKa || '', // For backward compatibility
+        district: property.areaData?.nameKa || '', // For backward compatibility
         photos: property.photos?.sort((a, b) => a.sortOrder - b.sortOrder)?.map(photo => photo.filePath) || []
       }
     });
@@ -911,7 +936,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
       order: { createdAt: 'DESC' },
       relations: [
         'city',
-        'area',
+        'areaData',
         'features',
         'advantages',
         'furnitureAppliances',
@@ -939,6 +964,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
         isFeatured: p.isFeatured,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
+        street: p.street,
         city: p.city?.nameEnglish || p.city?.nameGeorgian || '',
         cityData: {
           id: p.city?.id,
@@ -946,6 +972,13 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
           nameGeorgian: p.city?.nameGeorgian,
           nameEnglish: p.city?.nameEnglish
         },
+        areaData: p.areaData ? {
+          id: p.areaData.id,
+          nameKa: p.areaData.nameKa,
+          nameEn: p.areaData.nameEn,
+          nameRu: p.areaData.nameRu
+        } : null,
+        district: p.areaData?.nameKa || '',
         photos: p.photos ? p.photos.map(photo => photo.filePath) : [],
         // Empty arrays - full data only when needed
         features: [],
@@ -1048,6 +1081,7 @@ export const updateProperty = async (req: AuthenticatedRequest, res: Response): 
     if (propertyData.title !== undefined) property.title = propertyData.title;
     if (propertyData.propertyType !== undefined) property.propertyType = propertyData.propertyType;
     if (propertyData.dealType !== undefined) property.dealType = propertyData.dealType;
+    if (propertyData.dailyRentalSubcategory !== undefined) property.dailyRentalSubcategory = propertyData.dailyRentalSubcategory;
     if (propertyData.street !== undefined) property.street = propertyData.street;
     if (propertyData.area !== undefined) property.area = propertyData.area;
     if (propertyData.totalPrice !== undefined) property.totalPrice = propertyData.totalPrice;
