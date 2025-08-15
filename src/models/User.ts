@@ -5,6 +5,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   BeforeInsert,
+  ManyToOne,
+  JoinColumn,
   Index
 } from 'typeorm';
 import bcrypt from 'bcrypt';
@@ -12,6 +14,7 @@ import bcrypt from 'bcrypt';
 export enum UserRoleEnum {
   USER = 'user',
   AGENT = 'agent',
+  AGENCY = 'agency',
   ADMIN = 'admin'
 }
 
@@ -72,6 +75,14 @@ export class User {
 
   @Column({ name: 'last_login_at', type: 'timestamp with time zone', nullable: true })
   lastLoginAt?: Date;
+
+  // Agency relationship for agents
+  @Column({ name: 'agency_id', type: 'integer', nullable: true })
+  agencyId?: number;
+
+  @ManyToOne('Agency', { onDelete: 'SET NULL', lazy: true })
+  @JoinColumn({ name: 'agency_id' })
+  agency?: Promise<any>;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
   createdAt!: Date;

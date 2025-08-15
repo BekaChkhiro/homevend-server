@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database.js';
 import { User, UserRoleEnum } from '../models/User.js';
+import { Agency } from '../models/Agency.js';
 import { generateToken } from '../utils/jwt.js';
 import { generateTokenPair, verifyRefreshToken, generateAccessToken, revokeRefreshToken } from '../utils/refreshToken.js';
 import { LoginResponse } from '../types/auth.js';
@@ -8,9 +9,10 @@ import { AuthenticatedRequest } from '../types/auth.js';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { fullName, email, password, role = UserRoleEnum.USER } = req.body;
+    const { fullName, email, password, role = UserRoleEnum.USER, agencyData } = req.body;
 
     const userRepository = AppDataSource.getRepository(User);
+    const agencyRepository = AppDataSource.getRepository(Agency);
 
     // Check if user already exists
     const existingUser = await userRepository.findOne({ where: { email } });
@@ -22,36 +24,65 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Create new user
-    const user = new User();
-    user.fullName = fullName;
-    user.email = email;
-    user.password = password;
-    user.role = role;
+    // Use transaction for agency registration
+    const result = await AppDataSource.manager.transaction(async manager => {
+      // Create new user
+      const user = new User();
+      // For agency registration, use agency name as fullName if fullName is not provided
+      if (role === UserRoleEnum.AGENCY && !fullName && agencyData?.name) {
+        user.fullName = agencyData.name;
+      } else {
+        user.fullName = fullName || 'Agency User';
+      }
+      user.email = email;
+      user.password = password;
+      user.role = role;
 
-    const savedUser = await userRepository.save(user);
+      const savedUser = await manager.save(User, user);
+
+      // If registering as agency, create agency record
+      let savedAgency = null;
+      if (role === UserRoleEnum.AGENCY && agencyData) {
+        const agency = new Agency();
+        agency.ownerId = savedUser.id;
+        agency.name = agencyData.name;
+        agency.phone = agencyData.phone;
+        agency.website = agencyData.website || null;
+        agency.socialMediaUrl = agencyData.socialMediaUrl || null;
+        agency.email = email; // Use same email as user
+
+        savedAgency = await manager.save(Agency, agency);
+      }
+
+      return { savedUser, savedAgency };
+    });
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokenPair({
-      userId: savedUser.id,
-      email: savedUser.email,
-      role: savedUser.role
+      userId: result.savedUser.id,
+      email: result.savedUser.email,
+      role: result.savedUser.role
     });
 
     const response: LoginResponse = {
       user: {
-        id: savedUser.id,
-        fullName: savedUser.fullName,
-        email: savedUser.email,
-        role: savedUser.role
+        id: result.savedUser.id,
+        fullName: result.savedUser.fullName,
+        email: result.savedUser.email,
+        role: result.savedUser.role,
+        ...(result.savedAgency && { agencyId: result.savedAgency.id })
       },
       token: accessToken,
       refreshToken
     };
 
+    const message = role === UserRoleEnum.AGENCY 
+      ? 'Agency registered successfully'
+      : 'User registered successfully';
+
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message,
       data: response
     });
   } catch (error) {

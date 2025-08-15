@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database.js';
 import { Property, PropertyTypeEnum, DealTypeEnum, BuildingStatusEnum, ConstructionYearEnum, ConditionEnum } from '../models/Property.js';
 import { City } from '../models/City.js';
@@ -7,6 +7,7 @@ import { Advantage } from '../models/Advantage.js';
 import { FurnitureAppliance } from '../models/FurnitureAppliance.js';
 import { Tag } from '../models/Tag.js';
 import { PropertyPhoto } from '../models/PropertyPhoto.js';
+import { User } from '../models/User.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 import { FindManyOptions, Like, ILike, In, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 
@@ -798,7 +799,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
   }
 };
 
-export const getPropertyById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const getPropertyById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const propertyId = parseInt(id);
@@ -841,13 +842,14 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
       return;
     }
 
-    // Track view if user provided
-    if (req.user) {
+    // Track view if user provided (optional for public access)
+    const user = (req as any).user; // Cast to access user property if it exists
+    if (user) {
       const propertyViewRepository = AppDataSource.getRepository('PropertyView');
       try {
         await propertyViewRepository.save({
           propertyId: property.id,
-          userId: req.user.id,
+          userId: user.id,
           ipAddress: req.ip,
           userAgent: req.get('User-Agent'),
           referrer: req.get('Referer')
@@ -927,65 +929,78 @@ export const getPropertyById = async (req: AuthenticatedRequest, res: Response):
 
 export const getUserProperties = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    console.log('getUserProperties called for user:', req.user!.id, 'role:', req.user!.role);
+    
     const userId = req.user!.id;
     const propertyRepository = AppDataSource.getRepository(Property);
     
+    // Only fetch properties created by the current user (agency or regular user)
+    const whereCondition = { userId };
+
+    console.log('Fetching properties with condition:', whereCondition);
 
     const properties = await propertyRepository.find({
-      where: { userId },
+      where: whereCondition,
       order: { createdAt: 'DESC' },
       relations: [
+        'user',
         'city',
         'areaData',
-        'features',
-        'advantages',
-        'furnitureAppliances',
-        'tags',
         'photos'
       ]
     });
 
+    console.log(`Found ${properties.length} properties`);
     
+    const mappedProperties = properties.map(p => ({
+      id: p.id,
+      uuid: p.uuid,
+      title: p.title,
+      propertyType: p.propertyType,
+      dealType: p.dealType,
+      area: p.area,
+      totalPrice: p.totalPrice,
+      pricePerSqm: p.pricePerSqm,
+      currency: p.currency,
+      rooms: p.rooms,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      isFeatured: p.isFeatured,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      street: p.street,
+      city: p.city?.nameGeorgian || p.city?.nameEnglish || '',
+      // Include property owner info for agency dashboards
+      owner: p.user ? {
+        id: p.user.id,
+        fullName: p.user.fullName,
+        email: p.user.email
+      } : null,
+      isOwnProperty: p.userId === userId,
+      cityData: p.city ? {
+        id: p.city.id,
+        code: p.city.code,
+        nameGeorgian: p.city.nameGeorgian,
+        nameEnglish: p.city.nameEnglish
+      } : null,
+      areaData: p.areaData ? {
+        id: p.areaData.id,
+        nameKa: p.areaData.nameKa,
+        nameEn: p.areaData.nameEn,
+        nameRu: p.areaData.nameRu
+      } : null,
+      district: p.areaData?.nameKa || '',
+      photos: p.photos ? p.photos.map(photo => photo.filePath) : [],
+      // Empty arrays for compatibility
+      features: [],
+      advantages: [],
+      furnitureAppliances: [],
+      tags: []
+    }));
+
     res.status(200).json({
       success: true,
-      data: properties.map(p => ({
-        id: p.id,
-        uuid: p.uuid,
-        title: p.title,
-        propertyType: p.propertyType,
-        dealType: p.dealType,
-        area: p.area,
-        totalPrice: p.totalPrice,
-        pricePerSqm: p.pricePerSqm,
-        currency: p.currency,
-        rooms: p.rooms,
-        bedrooms: p.bedrooms,
-        bathrooms: p.bathrooms,
-        isFeatured: p.isFeatured,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-        street: p.street,
-        city: p.city?.nameEnglish || p.city?.nameGeorgian || '',
-        cityData: {
-          id: p.city?.id,
-          code: p.city?.code,
-          nameGeorgian: p.city?.nameGeorgian,
-          nameEnglish: p.city?.nameEnglish
-        },
-        areaData: p.areaData ? {
-          id: p.areaData.id,
-          nameKa: p.areaData.nameKa,
-          nameEn: p.areaData.nameEn,
-          nameRu: p.areaData.nameRu
-        } : null,
-        district: p.areaData?.nameKa || '',
-        photos: p.photos ? p.photos.map(photo => photo.filePath) : [],
-        // Empty arrays - full data only when needed
-        features: [],
-        advantages: [],
-        furnitureAppliances: [],
-        tags: []
-      }))
+      data: mappedProperties
     });
   } catch (error) {
     console.error('Get user properties error:', error);

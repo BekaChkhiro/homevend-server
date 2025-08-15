@@ -16,6 +16,7 @@ import { PropertyPhoto } from '../models/PropertyPhoto.js';
 import { UserFavorite } from '../models/UserFavorite.js';
 import { PropertyInquiry } from '../models/PropertyInquiry.js';
 import { PropertyView } from '../models/PropertyView.js';
+import { Agency } from '../models/Agency.js';
 
 // Create a new DataSource instance with proper typing
 // Use DATABASE_URL if available, otherwise use individual parameters
@@ -51,7 +52,8 @@ export const AppDataSource = new DataSource({
     PropertyPhoto, 
     UserFavorite, 
     PropertyInquiry, 
-    PropertyView
+    PropertyView,
+    Agency
   ],
   migrations: ['dist/migrations/*.js'],
   subscribers: ['dist/subscribers/*.js']

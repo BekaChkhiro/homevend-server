@@ -80,6 +80,14 @@ export class Property {
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
+  // Agency relationship (optional - properties can belong to agencies)
+  @Column({ name: 'agency_id', type: 'integer', nullable: true })
+  agencyId?: number;
+
+  @ManyToOne('Agency', { onDelete: 'SET NULL', lazy: true })
+  @JoinColumn({ name: 'agency_id' })
+  agency?: Promise<any>;
+
   // Basic Information
   @Column({ type: 'varchar', length: 300, nullable: false })
   title!: string;
@@ -281,7 +289,7 @@ export class Property {
 
   // Pricing
   @Column({ type: 'decimal', precision: 8, scale: 2, nullable: false })
-  totalArea!: number;
+  area!: number;
 
   @Column({ name: 'total_price', type: 'decimal', precision: 12, scale: 2, nullable: false })
   totalPrice!: number;
