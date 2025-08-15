@@ -9,6 +9,7 @@ import cityRoutes from './cities.js';
 import lookupRoutes from './lookup.js';
 import agencyRoutes from './agencies.js';
 import userRoutes from './users.js';
+import projectRoutes from './projects.js';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/cities', cityRoutes);
 router.use('/lookup', lookupRoutes);
 router.use('/agencies', agencyRoutes);
 router.use('/users', userRoutes);
+router.use('/projects', projectRoutes);
 
 export default router;
