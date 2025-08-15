@@ -7,6 +7,8 @@ import areaRoutes from './areas.js';
 import priceStatisticRoutes from './priceStatistics.js';
 import cityRoutes from './cities.js';
 import lookupRoutes from './lookup.js';
+import agencyRoutes from './agencies.js';
+import userRoutes from './users.js';
 
 const router = Router();
 
@@ -18,5 +20,7 @@ router.use('/areas', areaRoutes);
 router.use('/price-statistics', priceStatisticRoutes);
 router.use('/cities', cityRoutes);
 router.use('/lookup', lookupRoutes);
+router.use('/agencies', agencyRoutes);
+router.use('/users', userRoutes);
 
 export default router;

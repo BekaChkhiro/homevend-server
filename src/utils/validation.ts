@@ -5,7 +5,8 @@ export const registerSchema = z.object({
     fullName: z
       .string()
       .min(2, 'Full name must be at least 2 characters')
-      .max(100, 'Full name cannot exceed 100 characters'),
+      .max(100, 'Full name cannot exceed 100 characters')
+      .optional(),
     email: z
       .string()
       .email('Please provide a valid email address')
@@ -15,9 +16,24 @@ export const registerSchema = z.object({
       .min(6, 'Password must be at least 6 characters')
       .max(255, 'Password cannot exceed 255 characters'),
     role: z
-      .enum(['user', 'admin'])
+      .enum(['user', 'admin', 'agency'])
       .optional()
-      .default('user')
+      .default('user'),
+    agencyData: z.object({
+      name: z.string().min(2, 'Agency name must be at least 2 characters').max(300, 'Agency name cannot exceed 300 characters'),
+      phone: z.string().min(7, 'Phone number must be at least 7 characters').max(20, 'Phone number cannot exceed 20 characters'),
+      website: z.string().url('Invalid website URL').optional().or(z.literal('')),
+      socialMediaUrl: z.string().url('Invalid social media URL').optional().or(z.literal(''))
+    }).optional()
+  }).refine((data) => {
+    // If role is agency, agencyData is required
+    if (data.role === 'agency') {
+      return data.agencyData !== undefined;
+    }
+    // If role is not agency, fullName is required
+    return data.fullName !== undefined;
+  }, {
+    message: 'Agency registration requires agency data, regular registration requires full name'
   })
 });
 
