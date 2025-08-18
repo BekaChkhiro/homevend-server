@@ -22,10 +22,11 @@ import { ProjectPricing } from '../models/ProjectPricing.js';
 
 // Create a new DataSource instance with proper typing
 // Use DATABASE_URL if available, otherwise use individual parameters
+const isRenderDB = process.env.DB_HOST?.includes('render.com') || process.env.DATABASE_URL?.includes('render.com');
 const dbConfig = process.env.DATABASE_URL ? {
   type: 'postgres' as const,
   url: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: isRenderDB ? { rejectUnauthorized: false } : false
 } : {
   type: 'postgres' as const,
   host: process.env.DB_HOST || 'localhost',
@@ -33,7 +34,7 @@ const dbConfig = process.env.DATABASE_URL ? {
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'homevend',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: isRenderDB ? { rejectUnauthorized: false } : false
 };
 
 export const AppDataSource = new DataSource({
