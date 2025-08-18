@@ -7,7 +7,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "render-build": "npm install && npm run build",
+    "render-build": "echo 'Installing dependencies...' && npm install && echo 'Dependencies installed. Building...' && npm run build && echo 'Build complete!'",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:run:prod": "node -r ./dist/data-source.js node_modules/typeorm/cli.js migration:run",
     "lint": "eslint src --ext .ts",
