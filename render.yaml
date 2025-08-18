@@ -2,7 +2,7 @@ services:
   - type: web
     name: homevend-backend
     runtime: node
-    buildCommand: npm ci && npm run build
+    buildCommand: npm run render-build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
