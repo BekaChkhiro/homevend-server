@@ -4,6 +4,8 @@ import { AppDataSource } from '../config/database.js';
 import { User } from '../models/User.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 
+export type { AuthenticatedRequest };
+
 export const authenticate = async (
   req: AuthenticatedRequest,
   res: Response,

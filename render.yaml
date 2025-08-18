@@ -2,8 +2,8 @@ services:
   - type: web
     name: homevend-backend
     runtime: node
-    buildCommand: npm install && npm run build
-    startCommand: npm run migration:run && npm start
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production

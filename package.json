@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npm install --production=false && tsc",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:run:prod": "node -r ./dist/data-source.js node_modules/typeorm/cli.js migration:run",
     "lint": "eslint src --ext .ts",

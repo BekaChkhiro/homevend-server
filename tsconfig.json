@@ -22,7 +22,7 @@
     "sourceMap": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022"],
     "typeRoots": ["./node_modules/@types"]
   },
   "include": ["src/**/*"],
