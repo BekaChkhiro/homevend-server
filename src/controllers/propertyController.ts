@@ -247,6 +247,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     
     // Optional location fields
     if (propertyData.areaId !== undefined) property.areaId = propertyData.areaId;
+    if (propertyData.projectId !== undefined) property.projectId = propertyData.projectId;
     if (propertyData.streetNumber) property.streetNumber = propertyData.streetNumber;
     if (propertyData.postalCode) property.postalCode = propertyData.postalCode;
     if (propertyData.cadastralCode) property.cadastralCode = propertyData.cadastralCode;
@@ -830,7 +831,9 @@ export const getPropertyById = async (req: Request, res: Response): Promise<void
         'advantages',
         'furnitureAppliances',
         'tags',
-        'photos'
+        'photos',
+        'project',
+        'project.city'
       ]
     });
     
@@ -951,6 +954,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
     });
 
     console.log(`Found ${properties.length} properties`);
+    console.log('Sample property projectId:', properties[0]?.projectId);
     
     const mappedProperties = properties.map(p => ({
       id: p.id,
@@ -970,6 +974,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
       updatedAt: p.updatedAt,
       street: p.street,
       city: p.city?.nameGeorgian || p.city?.nameEnglish || '',
+      projectId: p.projectId,
       // Include property owner info for agency dashboards
       owner: p.user ? {
         id: p.user.id,
@@ -1014,6 +1019,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
 export const updateProperty = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {    
     const { id } = req.params;
+    console.log('UPDATE Property:', id, 'Body:', req.body);
     const propertyRepository = AppDataSource.getRepository(Property);
     
     const property = await propertyRepository.findOne({
@@ -1110,6 +1116,9 @@ export const updateProperty = async (req: AuthenticatedRequest, res: Response): 
     if (propertyData.cadastralCode !== undefined) property.cadastralCode = propertyData.cadastralCode;
     if (propertyData.latitude !== undefined) property.latitude = propertyData.latitude;
     if (propertyData.longitude !== undefined) property.longitude = propertyData.longitude;
+    
+    // Project linking
+    if (propertyData.projectId !== undefined) property.projectId = propertyData.projectId;
     
     // Optional property details
     if (propertyData.rooms !== undefined) property.rooms = propertyData.rooms;
@@ -1338,6 +1347,7 @@ export const updateProperty = async (req: AuthenticatedRequest, res: Response): 
     }
 
     await propertyRepository.save(property);
+    console.log('Property saved with projectId:', property.projectId);
     
     res.status(200).json({
       success: true,

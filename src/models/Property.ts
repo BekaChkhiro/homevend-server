@@ -88,6 +88,14 @@ export class Property {
   @JoinColumn({ name: 'agency_id' })
   agency?: Promise<any>;
 
+  // Project relationship (optional - properties can belong to projects)
+  @Column({ name: 'project_id', type: 'integer', nullable: true })
+  projectId?: number;
+
+  @ManyToOne('Project', { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'project_id' })
+  project?: any;
+
   // Basic Information
   @Column({ type: 'varchar', length: 300, nullable: false })
   title!: string;

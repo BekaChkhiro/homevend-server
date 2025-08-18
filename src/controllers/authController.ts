@@ -9,7 +9,7 @@ import { AuthenticatedRequest } from '../types/auth.js';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { fullName, email, password, role = UserRoleEnum.USER, agencyData } = req.body;
+    const { fullName, email, password, role = UserRoleEnum.USER, agencyData, developerData } = req.body;
 
     const userRepository = AppDataSource.getRepository(User);
     const agencyRepository = AppDataSource.getRepository(Agency);
@@ -28,15 +28,30 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const result = await AppDataSource.manager.transaction(async manager => {
       // Create new user
       const user = new User();
-      // For agency registration, use agency name as fullName if fullName is not provided
+      
+      // Handle fullName based on role
       if (role === UserRoleEnum.AGENCY && !fullName && agencyData?.name) {
         user.fullName = agencyData.name;
+      } else if (role === UserRoleEnum.DEVELOPER && !fullName && developerData?.name) {
+        user.fullName = developerData.name;
+      } else if (fullName) {
+        user.fullName = fullName;
       } else {
-        user.fullName = fullName || 'Agency User';
+        // Fallback names based on role - no more "Agency User" default
+        user.fullName = role === UserRoleEnum.AGENCY ? agencyData?.name || 'სააგენტო' : 
+                       role === UserRoleEnum.DEVELOPER ? developerData?.name || 'დეველოპერი' : 'მომხმარებელი';
       }
+      
       user.email = email;
       user.password = password;
       user.role = role;
+      
+      // Add phone number if provided
+      if (role === UserRoleEnum.AGENCY && agencyData?.phone) {
+        user.phone = agencyData.phone;
+      } else if (role === UserRoleEnum.DEVELOPER && developerData?.phone) {
+        user.phone = developerData.phone;
+      }
 
       const savedUser = await manager.save(User, user);
 
@@ -70,6 +85,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         fullName: result.savedUser.fullName,
         email: result.savedUser.email,
         role: result.savedUser.role,
+        phoneNumber: result.savedUser.phone,
         ...(result.savedAgency && { agencyId: result.savedAgency.id })
       },
       token: accessToken,
@@ -78,6 +94,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const message = role === UserRoleEnum.AGENCY 
       ? 'Agency registered successfully'
+      : role === UserRoleEnum.DEVELOPER
+      ? 'Developer registered successfully'
       : 'User registered successfully';
 
     res.status(201).json({
