@@ -677,43 +677,8 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         isFeatured: 'DESC',
         createdAt: 'DESC' 
       },
-      relations: ['user', 'city', 'areaData'],
-      select: {
-        id: true,
-        uuid: true,
-        title: true,
-        propertyType: true,
-        dealType: true,
-        area: true,
-        totalPrice: true,
-        pricePerSqm: true,
-        currency: true,
-        rooms: true,
-        bedrooms: true,
-        bathrooms: true,
-        isFeatured: true,
-        createdAt: true,
-        street: true,
-        areaId: true,
-        user: {
-          id: true,
-          fullName: true,
-          email: true,
-          phone: true
-        },
-        city: {
-          id: true,
-          code: true,
-          nameGeorgian: true,
-          nameEnglish: true
-        },
-        areaData: {
-          id: true,
-          nameKa: true,
-          nameEn: true,
-          nameRu: true
-        }
-      }
+      // Include relations so frontend can filter by them
+      relations: ['user', 'city', 'areaData', 'features', 'advantages', 'furnitureAppliances', 'tags']
     };
 
     const [properties, total] = await propertyRepository.findAndCount(options);
@@ -734,13 +699,14 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     // Create a map for quick lookup
     const photoMap = new Map(primaryPhotos.map(photo => [photo.propertyId, photo.filePath]));
     
-    // Build response without additional queries
+    // Build response
     const propertiesWithPhotos = properties.map(property => ({
       id: property.id,
       uuid: property.uuid,
       title: property.title,
       propertyType: property.propertyType,
       dealType: property.dealType,
+      dailyRentalSubcategory: property.dailyRentalSubcategory,
       area: property.area,
       totalPrice: property.totalPrice,
       pricePerSqm: property.pricePerSqm,
@@ -748,6 +714,36 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       rooms: property.rooms,
       bedrooms: property.bedrooms,
       bathrooms: property.bathrooms,
+      totalFloors: property.totalFloors,
+      propertyFloor: property.propertyFloor,
+      buildingStatus: property.buildingStatus,
+      constructionYear: property.constructionYear,
+      condition: property.condition,
+      projectType: property.projectType,
+      ceilingHeight: property.ceilingHeight,
+      // Infrastructure
+      heating: property.heating,
+      parking: property.parking,
+      hotWater: property.hotWater,
+      buildingMaterial: property.buildingMaterial,
+      // Booleans and areas
+      hasBalcony: property.hasBalcony,
+      balconyCount: property.balconyCount,
+      balconyArea: property.balconyArea,
+      hasPool: property.hasPool,
+      poolType: property.poolType,
+      hasLivingRoom: property.hasLivingRoom,
+      livingRoomArea: property.livingRoomArea,
+      livingRoomType: property.livingRoomType,
+      hasLoggia: property.hasLoggia,
+      loggiaArea: property.loggiaArea,
+      hasVeranda: property.hasVeranda,
+      verandaArea: property.verandaArea,
+      hasYard: property.hasYard,
+      yardArea: property.yardArea,
+      hasStorage: property.hasStorage,
+      storageArea: property.storageArea,
+      storageType: property.storageType,
       isFeatured: property.isFeatured,
       createdAt: property.createdAt,
       street: property.street,
@@ -772,11 +768,11 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         phone: property.user.phone
       },
       photos: photoMap.get(property.id) ? [photoMap.get(property.id)] : [],
-      // Empty arrays for list view - full data loaded on detail view
-      features: [],
-      advantages: [],
-      furnitureAppliances: [],
-      tags: []
+      // Include relation arrays for client-side filtering
+      features: property.features || [],
+      advantages: property.advantages || [],
+      furnitureAppliances: property.furnitureAppliances || [],
+      tags: property.tags || []
     }));
     
     res.status(200).json({
