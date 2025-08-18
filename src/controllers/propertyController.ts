@@ -887,16 +887,16 @@ export const getPropertyById = async (req: Request, res: Response): Promise<void
         // Return codes for editing, display names for viewing
         features: isForEditing 
           ? property.features?.map(f => f.code) || []
-          : property.features?.map(f => f.nameEnglish || f.code) || [],
+          : property.features?.map(f => f.code) || [],
         advantages: isForEditing
           ? property.advantages?.map(a => a.code) || []
-          : property.advantages?.map(a => a.nameEnglish || a.code) || [],
+          : property.advantages?.map(a => a.code) || [],
         furnitureAppliances: isForEditing
           ? property.furnitureAppliances?.map(fa => fa.code) || []
-          : property.furnitureAppliances?.map(fa => fa.nameEnglish || fa.code) || [],
+          : property.furnitureAppliances?.map(fa => fa.code) || [],
         tags: isForEditing
           ? property.tags?.map(t => t.code) || []
-          : property.tags?.map(t => t.nameEnglish || t.code) || [],
+          : property.tags?.map(t => t.code) || [],
         city: property.city?.nameEnglish || property.city?.nameGeorgian || '',
         user: { 
           id: property.user.id, 
