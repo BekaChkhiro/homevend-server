@@ -18,6 +18,7 @@ export interface LoginResponse {
     fullName: string;
     email: string;
     role: UserRoleEnum;
+    phoneNumber?: string;
   };
   token: string;
   refreshToken?: string;

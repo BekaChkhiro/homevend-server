@@ -41,7 +41,7 @@ export const favoritesController = {
         propertyType: fav.property.propertyType,
         dealType: fav.property.dealType,
         city: fav.property.city?.nameGeorgian || fav.property.city?.nameEnglish || '',
-        district: fav.property.areaData?.nameKa || fav.property.district || '',
+        district: fav.property.areaData?.nameKa || '',
         street: fav.property.street,
         area: fav.property.area,
         totalPrice: fav.property.totalPrice,
@@ -49,7 +49,6 @@ export const favoritesController = {
         bathrooms: fav.property.bathrooms,
         photos: fav.property.photos || [],
         contactPhone: fav.property.contactPhone,
-        status: fav.property.status,
         createdAt: fav.property.createdAt,
         favoriteAddedAt: fav.createdAt,
         user: {
@@ -60,7 +59,7 @@ export const favoritesController = {
         }
       }));
 
-      res.json({
+      return res.json({
         success: true,
         data: {
           favorites: formattedFavorites,
@@ -70,7 +69,7 @@ export const favoritesController = {
 
     } catch (error) {
       console.error('Error fetching favorites:', error);
-      res.status(500).json({ success: false, message: 'Server error' });
+      return res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
@@ -115,7 +114,7 @@ export const favoritesController = {
 
       await favoriteRepository.save(favorite);
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         message: 'Property added to favorites',
         data: { favoriteId: favorite.id }
@@ -123,7 +122,7 @@ export const favoritesController = {
 
     } catch (error) {
       console.error('Error adding to favorites:', error);
-      res.status(500).json({ success: false, message: 'Server error' });
+      return res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
@@ -152,14 +151,14 @@ export const favoritesController = {
 
       await favoriteRepository.remove(favorite);
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Property removed from favorites'
       });
 
     } catch (error) {
       console.error('Error removing from favorites:', error);
-      res.status(500).json({ success: false, message: 'Server error' });
+      return res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
@@ -182,14 +181,14 @@ export const favoritesController = {
         where: { userId, propertyId }
       });
 
-      res.json({
+      return res.json({
         success: true,
         data: { isFavorite: !!favorite }
       });
 
     } catch (error) {
       console.error('Error checking favorite status:', error);
-      res.status(500).json({ success: false, message: 'Server error' });
+      return res.status(500).json({ success: false, message: 'Server error' });
     }
   }
 };
