@@ -13,6 +13,7 @@ import { User } from './User.js';
 import { City } from './City.js';
 import { Area } from './Area.js';
 import { ProjectPricing } from './ProjectPricing.js';
+import { ProjectAmenity } from './ProjectAmenity.js';
 
 export enum ProjectTypeEnum {
   PRIVATE_HOUSE = 'private_house',
@@ -232,6 +233,12 @@ export class Project {
   // Relationships
   @OneToMany(() => ProjectPricing, pricing => pricing.project, { cascade: true })
   pricing!: ProjectPricing[];
+
+  @OneToMany('Property', 'project', { lazy: true })
+  properties?: Promise<any[]>;
+
+  @OneToMany(() => ProjectAmenity, amenity => amenity.project, { cascade: true })
+  amenities!: ProjectAmenity[];
 
   // Timestamps
   @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })

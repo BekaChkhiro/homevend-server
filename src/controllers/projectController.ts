@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database.js';
 import { Project, ProjectTypeEnum, DeliveryStatusEnum } from '../models/Project.js';
 import { ProjectPricing, RoomTypeEnum } from '../models/ProjectPricing.js';
+import { ProjectAmenity, AmenityDistanceEnum } from '../models/ProjectAmenity.js';
+import { Property } from '../models/Property.js';
 import { User, UserRoleEnum } from '../models/User.js';
 import { City } from '../models/City.js';
 import { Area } from '../models/Area.js';
@@ -37,7 +39,7 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
         'project.createdAt',
         'city.id', 'city.nameGeorgian',
         'areaData.id', 'areaData.nameKa',
-        'developer.id', 'developer.fullName',
+        'developer.id', 'developer.fullName', 'developer.phone',
         'pricing'
       ]);
 
@@ -100,6 +102,7 @@ export const getProjectById = async (req: Request, res: Response): Promise<void>
       .leftJoinAndSelect('project.areaData', 'areaData')
       .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
+      .leftJoinAndSelect('project.amenities', 'amenities')
       .where('project.id = :id', { id })
       .andWhere('project.isActive = :isActive', { isActive: true })
       .getOne();
@@ -112,7 +115,27 @@ export const getProjectById = async (req: Request, res: Response): Promise<void>
     // Increment view count
     await projectRepository.increment({ id: project.id }, 'viewCount', 1);
 
-    res.json(project);
+    // Get linked properties
+    const propertyRepository = AppDataSource.getRepository(Property);
+    const linkedProperties = await propertyRepository
+      .createQueryBuilder('property')
+      .leftJoinAndSelect('property.city', 'city')
+      .leftJoinAndSelect('property.areaData', 'areaData')
+      .leftJoinAndSelect('property.user', 'user')
+      .where('property.projectId = :projectId', { projectId: project.id })
+      .select([
+        'property.id', 'property.uuid', 'property.title', 'property.propertyType',
+        'property.dealType', 'property.street', 'property.streetNumber', 
+        'property.area', 'property.totalPrice', 'property.pricePerSqm',
+        'property.rooms', 'property.bedrooms', 'property.bathrooms',
+        'property.viewCount', 'property.createdAt',
+        'city.id', 'city.nameGeorgian',
+        'areaData.id', 'areaData.nameKa',
+        'user.id', 'user.fullName'
+      ])
+      .getMany();
+
+    res.json({ ...project, linkedProperties });
   } catch (error) {
     console.error('Error fetching project:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -288,7 +311,9 @@ export const createProject = async (req: AuthenticatedRequest, res: Response): P
       fireSystem,
       mainDoorLock,
       // Pricing data
-      pricing
+      pricing,
+      // Custom amenities with distances
+      customAmenities
     } = req.body;
 
     // Verify city exists
@@ -397,6 +422,47 @@ export const createProject = async (req: AuthenticatedRequest, res: Response): P
       await projectPricingRepository.save(pricingEntries);
     }
 
+    // Create amenities if provided
+    if (customAmenities && typeof customAmenities === 'object') {
+      const amenityRepository = AppDataSource.getRepository(ProjectAmenity);
+      const amenityEntries = [];
+
+      for (const [amenityType, distance] of Object.entries(customAmenities)) {
+        if (distance && typeof distance === 'string') {
+          // Convert distance format from frontend to enum
+          let distanceEnum: AmenityDistanceEnum;
+          switch (distance) {
+            case 'onSite':
+              distanceEnum = AmenityDistanceEnum.ON_SITE;
+              break;
+            case '300m':
+              distanceEnum = AmenityDistanceEnum.WITHIN_300M;
+              break;
+            case '500m':
+              distanceEnum = AmenityDistanceEnum.WITHIN_500M;
+              break;
+            case '1km':
+              distanceEnum = AmenityDistanceEnum.WITHIN_1KM;
+              break;
+            default:
+              continue; // Skip invalid distances
+          }
+
+          amenityEntries.push(
+            amenityRepository.create({
+              projectId: savedProject.id,
+              amenityType,
+              distance: distanceEnum
+            })
+          );
+        }
+      }
+
+      if (amenityEntries.length > 0) {
+        await amenityRepository.save(amenityEntries);
+      }
+    }
+
     // Fetch the complete project with relations
     const completeProject = await projectRepository
       .createQueryBuilder('project')
@@ -404,6 +470,7 @@ export const createProject = async (req: AuthenticatedRequest, res: Response): P
       .leftJoinAndSelect('project.areaData', 'areaData')
       .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
+      .leftJoinAndSelect('project.amenities', 'amenities')
       .where('project.id = :id', { id: savedProject.id })
       .getOne();
 
@@ -451,6 +518,7 @@ export const updateProject = async (req: AuthenticatedRequest, res: Response): P
       numberOfFloors,
       parkingSpaces,
       pricing,
+      customAmenities,
       ...amenities
     } = req.body;
 
@@ -522,6 +590,54 @@ export const updateProject = async (req: AuthenticatedRequest, res: Response): P
       await projectPricingRepository.save(pricingEntries);
     }
 
+    // Update amenities if provided
+    if (customAmenities !== undefined) {
+      const amenityRepository = AppDataSource.getRepository(ProjectAmenity);
+      
+      // Remove existing amenities
+      await amenityRepository.delete({ projectId: project.id });
+      
+      // Add new amenities
+      if (customAmenities && typeof customAmenities === 'object') {
+        const amenityEntries = [];
+
+        for (const [amenityType, distance] of Object.entries(customAmenities)) {
+          if (distance && typeof distance === 'string') {
+            // Convert distance format from frontend to enum
+            let distanceEnum: AmenityDistanceEnum;
+            switch (distance) {
+              case 'onSite':
+                distanceEnum = AmenityDistanceEnum.ON_SITE;
+                break;
+              case '300m':
+                distanceEnum = AmenityDistanceEnum.WITHIN_300M;
+                break;
+              case '500m':
+                distanceEnum = AmenityDistanceEnum.WITHIN_500M;
+                break;
+              case '1km':
+                distanceEnum = AmenityDistanceEnum.WITHIN_1KM;
+                break;
+              default:
+                continue; // Skip invalid distances
+            }
+
+            amenityEntries.push(
+              amenityRepository.create({
+                projectId: project.id,
+                amenityType,
+                distance: distanceEnum
+              })
+            );
+          }
+        }
+
+        if (amenityEntries.length > 0) {
+          await amenityRepository.save(amenityEntries);
+        }
+      }
+    }
+
     // Fetch updated project
     const updatedProject = await projectRepository
       .createQueryBuilder('project')
@@ -529,6 +645,7 @@ export const updateProject = async (req: AuthenticatedRequest, res: Response): P
       .leftJoinAndSelect('project.areaData', 'areaData')
       .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
+      .leftJoinAndSelect('project.amenities', 'amenities')
       .where('project.id = :id', { id: project.id })
       .getOne();
 

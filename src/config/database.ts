@@ -19,6 +19,7 @@ import { PropertyView } from '../models/PropertyView.js';
 import { Agency } from '../models/Agency.js';
 import { Project } from '../models/Project.js';
 import { ProjectPricing } from '../models/ProjectPricing.js';
+import { ProjectAmenity } from '../models/ProjectAmenity.js';
 
 // Create a new DataSource instance with proper typing
 // Use DATABASE_URL if available, otherwise use individual parameters
@@ -58,7 +59,8 @@ export const AppDataSource = new DataSource({
     PropertyView,
     Agency,
     Project,
-    ProjectPricing
+    ProjectPricing,
+    ProjectAmenity
   ],
   migrations: ['dist/migrations/*.js'],
   subscribers: ['dist/subscribers/*.js']

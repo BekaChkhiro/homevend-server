@@ -28,6 +28,7 @@ router.get('/:id', getPropertyById);
 router.use(authenticate);
 router.post('/', validate(propertySchema), createProperty);
 router.put('/:id', validate(propertySchema), updateProperty);
+router.patch('/:id', updateProperty); // Allow PATCH without full validation for partial updates
 router.delete('/:id', deleteProperty);
 
 
