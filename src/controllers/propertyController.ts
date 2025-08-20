@@ -612,10 +612,12 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
   try {
     const {
       page = 1,
-      limit = 10,
+      limit = 16,
       cityId,
+      city,
       propertyType,
       dealType,
+      dailyRentalSubcategory,
       minPrice,
       maxPrice,
       minArea,
@@ -624,82 +626,376 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       rooms,
       bedrooms,
       bathrooms,
+      totalFloors,
+      buildingStatus,
+      constructionYearMin,
+      constructionYearMax,
+      condition,
+      projectType,
+      ceilingHeightMin,
+      ceilingHeightMax,
+      heating,
+      parking,
+      hotWater,
+      buildingMaterial,
+      hasBalcony,
+      hasPool,
+      hasLivingRoom,
+      hasLoggia,
+      hasVeranda,
+      hasYard,
+      hasStorage,
+      search,
+      location,
       features,
       advantages,
-      tags,
-      isFeatured
+      furnitureAppliances,
+      isFeatured,
+      sort = 'newest'
     } = req.query;
     
+    console.log('🔍 getProperties called with filters:', req.query);
+    
     const propertyRepository = AppDataSource.getRepository(Property);
+    const cityRepository = AppDataSource.getRepository(City);
 
-    const where: any = {};
-    
+    // Build query builder for complex filtering
+    let queryBuilder = propertyRepository
+      .createQueryBuilder('property')
+      .leftJoinAndSelect('property.city', 'city')
+      .leftJoinAndSelect('property.areaData', 'area')
+      .select([
+        'property.id',
+        'property.uuid', 
+        'property.title',
+        'property.propertyType',
+        'property.dealType',
+        'property.dailyRentalSubcategory',
+        'property.area',
+        'property.totalPrice',
+        'property.pricePerSqm',
+        'property.currency',
+        'property.rooms',
+        'property.bedrooms',
+        'property.bathrooms',
+        'property.totalFloors',
+        'property.propertyFloor',
+        'property.buildingStatus',
+        'property.constructionYear',
+        'property.condition',
+        'property.projectType',
+        'property.ceilingHeight',
+        'property.heating',
+        'property.parking',
+        'property.hotWater',
+        'property.buildingMaterial',
+        'property.hasBalcony',
+        'property.balconyCount',
+        'property.balconyArea',
+        'property.hasPool',
+        'property.poolType',
+        'property.hasLivingRoom',
+        'property.livingRoomArea',
+        'property.livingRoomType',
+        'property.hasLoggia',
+        'property.loggiaArea',
+        'property.hasVeranda',
+        'property.verandaArea',
+        'property.hasYard',
+        'property.yardArea',
+        'property.hasStorage',
+        'property.storageArea',
+        'property.storageType',
+        'property.isFeatured',
+        'property.createdAt',
+        'property.updatedAt',
+        'property.street',
+        'property.contactName',
+        'property.contactPhone',
+        'property.contactEmail',
+        'property.viewCount',
+        'property.favoriteCount',
+        'property.inquiryCount',
+        'city.id',
+        'city.code',
+        'city.nameGeorgian',
+        'city.nameEnglish',
+        'area.id',
+        'area.nameKa',
+        'area.nameEn',
+        'area.nameRu'
+      ]);
+
     // Location filters
-    if (cityId) where.cityId = cityId;
-    if (areaId) where.areaId = areaId;
+    if (cityId) {
+      queryBuilder.andWhere('property.cityId = :cityId', { cityId: Number(cityId) });
+    } else if (city && city !== 'all') {
+      // Handle city name search
+      const foundCity = await cityRepository.findOne({
+        where: [
+          { nameGeorgian: String(city) },
+          { nameEnglish: String(city) },
+          { code: String(city) }
+        ]
+      });
+      if (foundCity) {
+        queryBuilder.andWhere('property.cityId = :cityId', { cityId: foundCity.id });
+      }
+    }
     
-    // Basic filters
-    if (propertyType) where.propertyType = propertyType;
-    if (dealType) where.dealType = dealType;
+    if (areaId) {
+      queryBuilder.andWhere('property.areaId = :areaId', { areaId: Number(areaId) });
+    }
 
+    // Search filters
+    if (search && String(search).trim()) {
+      const searchTerm = String(search).trim();
+      queryBuilder.andWhere(
+        '(property.title ILIKE :search OR property.street ILIKE :search OR city.nameGeorgian ILIKE :search OR city.nameEnglish ILIKE :search OR area.nameKa ILIKE :search)',
+        { search: `%${searchTerm}%` }
+      );
+    }
+
+    if (location && String(location).trim()) {
+      const locationTerm = String(location).trim();
+      queryBuilder.andWhere(
+        '(property.street ILIKE :location OR city.nameGeorgian ILIKE :location OR city.nameEnglish ILIKE :location OR area.nameKa ILIKE :location OR area.nameEn ILIKE :location)',
+        { location: `%${locationTerm}%` }
+      );
+    }
+    
+    // Property type filters
+    if (propertyType && Array.isArray(propertyType) && propertyType.length > 0) {
+      queryBuilder.andWhere('property.propertyType IN (:...propertyTypes)', { propertyTypes: propertyType });
+    } else if (propertyType && typeof propertyType === 'string' && propertyType !== 'all') {
+      queryBuilder.andWhere('property.propertyType = :propertyType', { propertyType });
+    }
+
+    // Deal type filter
+    if (dealType && dealType !== 'all') {
+      queryBuilder.andWhere('property.dealType = :dealType', { dealType });
+    }
+
+    // Daily rental subcategory
+    if (dailyRentalSubcategory && dailyRentalSubcategory !== 'all') {
+      queryBuilder.andWhere('property.dailyRentalSubcategory = :dailyRentalSubcategory', { dailyRentalSubcategory });
+    }
     
     // Price range
-    if (minPrice && maxPrice) {
-      where.totalPrice = Between(Number(minPrice), Number(maxPrice));
-    } else if (minPrice) {
-      where.totalPrice = MoreThanOrEqual(Number(minPrice));
-    } else if (maxPrice) {
-      where.totalPrice = LessThanOrEqual(Number(maxPrice));
+    if (minPrice) {
+      queryBuilder.andWhere('property.totalPrice >= :minPrice', { minPrice: Number(minPrice) });
+    }
+    if (maxPrice) {
+      queryBuilder.andWhere('property.totalPrice <= :maxPrice', { maxPrice: Number(maxPrice) });
     }
     
     // Area range
-    if (minArea && maxArea) {
-      where.area = Between(Number(minArea), Number(maxArea));
-    } else if (minArea) {
-      where.area = MoreThanOrEqual(Number(minArea));
-    } else if (maxArea) {
-      where.area = LessThanOrEqual(Number(maxArea));
+    if (minArea) {
+      queryBuilder.andWhere('property.area >= :minArea', { minArea: Number(minArea) });
+    }
+    if (maxArea) {
+      queryBuilder.andWhere('property.area <= :maxArea', { maxArea: Number(maxArea) });
     }
     
-    // Property details
-    if (rooms) where.rooms = rooms;
-    if (bedrooms) where.bedrooms = bedrooms;
-    if (bathrooms) where.bathrooms = bathrooms;
+    // Room filters
+    if (bedrooms && Array.isArray(bedrooms) && bedrooms.length > 0) {
+      const bedroomConditions = bedrooms.map((bedroom, index) => {
+        if (bedroom === '10+') {
+          return `property.bedrooms >= 10`;
+        }
+        return `property.bedrooms = ${Number(bedroom)}`;
+      });
+      if (bedroomConditions.length > 0) {
+        queryBuilder.andWhere(`(${bedroomConditions.join(' OR ')})`);
+      }
+    } else if (bedrooms && typeof bedrooms === 'string' && bedrooms !== 'all') {
+      if (bedrooms === '10+') {
+        queryBuilder.andWhere('property.bedrooms >= 10');
+      } else {
+        queryBuilder.andWhere('property.bedrooms = :bedrooms', { bedrooms: Number(bedrooms) });
+      }
+    }
+
+    if (bathrooms && Array.isArray(bathrooms) && bathrooms.length > 0) {
+      const bathroomConditions = bathrooms.map((bathroom) => {
+        if (bathroom === '3+') {
+          return `property.bathrooms >= 3`;
+        }
+        if (bathroom === 'shared') {
+          return `property.bathrooms = 0`;
+        }
+        return `property.bathrooms = ${Number(bathroom)}`;
+      });
+      if (bathroomConditions.length > 0) {
+        queryBuilder.andWhere(`(${bathroomConditions.join(' OR ')})`);
+      }
+    } else if (bathrooms && typeof bathrooms === 'string' && bathrooms !== 'all') {
+      if (bathrooms === '3+') {
+        queryBuilder.andWhere('property.bathrooms >= 3');
+      } else if (bathrooms === 'shared') {
+        queryBuilder.andWhere('property.bathrooms = 0');
+      } else {
+        queryBuilder.andWhere('property.bathrooms = :bathrooms', { bathrooms: Number(bathrooms) });
+      }
+    }
+
+    if (rooms && Array.isArray(rooms) && rooms.length > 0) {
+      const roomConditions = rooms.map((room) => {
+        if (room === '10+') {
+          return `(property.rooms >= 10 OR (property.rooms IS NULL AND property.bedrooms >= 10))`;
+        }
+        return `(property.rooms = ${Number(room)} OR (property.rooms IS NULL AND property.bedrooms = ${Number(room)}))`;
+      });
+      if (roomConditions.length > 0) {
+        queryBuilder.andWhere(`(${roomConditions.join(' OR ')})`);
+      }
+    } else if (rooms && typeof rooms === 'string' && rooms !== 'all') {
+      if (rooms === '10+') {
+        queryBuilder.andWhere('(property.rooms >= 10 OR (property.rooms IS NULL AND property.bedrooms >= 10))');
+      } else {
+        queryBuilder.andWhere('(property.rooms = :rooms OR (property.rooms IS NULL AND property.bedrooms = :rooms))', { rooms: Number(rooms) });
+      }
+    }
+
+    // Building details filters
+    if (totalFloors && totalFloors !== 'all') {
+      queryBuilder.andWhere('property.totalFloors = :totalFloors', { totalFloors });
+    }
+
+    if (buildingStatus && buildingStatus !== 'all') {
+      queryBuilder.andWhere('property.buildingStatus = :buildingStatus', { buildingStatus });
+    }
+
+    if (condition && condition !== 'all') {
+      // Handle condition filter mapping
+      let conditionValue = condition;
+      if (condition === 'ongoing-renovation') conditionValue = 'under-renovation';
+      if (condition === 'white-plus') conditionValue = 'white-frame';
+      queryBuilder.andWhere('property.condition = :condition', { condition: conditionValue });
+    }
+
+    if (projectType && projectType !== 'all') {
+      queryBuilder.andWhere('property.projectType = :projectType', { projectType });
+    }
+
+    // Construction year range
+    if (constructionYearMin) {
+      queryBuilder.andWhere('property.constructionYear >= :constructionYearMin', { constructionYearMin });
+    }
+    if (constructionYearMax) {
+      queryBuilder.andWhere('property.constructionYear <= :constructionYearMax', { constructionYearMax });
+    }
+
+    // Ceiling height range
+    if (ceilingHeightMin) {
+      queryBuilder.andWhere('property.ceilingHeight >= :ceilingHeightMin', { ceilingHeightMin: Number(ceilingHeightMin) });
+    }
+    if (ceilingHeightMax) {
+      queryBuilder.andWhere('property.ceilingHeight <= :ceilingHeightMax', { ceilingHeightMax: Number(ceilingHeightMax) });
+    }
+
+    // Infrastructure filters
+    if (heating && heating !== 'all') {
+      queryBuilder.andWhere('property.heating = :heating', { heating });
+    }
+
+    if (parking && parking !== 'all') {
+      queryBuilder.andWhere('property.parking = :parking', { parking });
+    }
+
+    if (hotWater && hotWater !== 'all') {
+      queryBuilder.andWhere('property.hotWater = :hotWater', { hotWater });
+    }
+
+    if (buildingMaterial && buildingMaterial !== 'all') {
+      queryBuilder.andWhere('property.buildingMaterial = :buildingMaterial', { buildingMaterial });
+    }
+
+    // Boolean amenities filters
+    if (hasBalcony === 'true') {
+      queryBuilder.andWhere('property.hasBalcony = true');
+    }
+
+    if (hasPool === 'true') {
+      queryBuilder.andWhere('property.hasPool = true');
+    }
+
+    if (hasLivingRoom === 'true') {
+      queryBuilder.andWhere('property.hasLivingRoom = true');
+    }
+
+    if (hasLoggia === 'true') {
+      queryBuilder.andWhere('property.hasLoggia = true');
+    }
+
+    if (hasVeranda === 'true') {
+      queryBuilder.andWhere('property.hasVeranda = true');
+    }
+
+    if (hasYard === 'true') {
+      queryBuilder.andWhere('property.hasYard = true');
+    }
+
+    if (hasStorage === 'true') {
+      queryBuilder.andWhere('property.hasStorage = true');
+    }
 
     // Featured filter
-    if (isFeatured === 'true') where.isFeatured = true;
-    
-    const options: FindManyOptions<Property> = {
-      where,
-      take: Number(limit),
-      skip: (Number(page) - 1) * Number(limit),
-      order: { 
-        isFeatured: 'DESC',
-        createdAt: 'DESC' 
-      },
-      // Include relations so frontend can filter by them
-      relations: ['user', 'city', 'areaData', 'features', 'advantages', 'furnitureAppliances', 'tags']
-    };
+    if (isFeatured === 'true') {
+      queryBuilder.andWhere('property.isFeatured = true');
+    }
 
-    const [properties, total] = await propertyRepository.findAndCount(options);
+    // Apply sorting
+    switch (sort) {
+      case 'price-low':
+        queryBuilder.orderBy('property.totalPrice', 'ASC');
+        break;
+      case 'price-high':
+        queryBuilder.orderBy('property.totalPrice', 'DESC');
+        break;
+      case 'area-large':
+        queryBuilder.orderBy('property.area', 'DESC');
+        break;
+      case 'area-small':
+        queryBuilder.orderBy('property.area', 'ASC');
+        break;
+      case 'newest':
+      default:
+        queryBuilder.orderBy('property.isFeatured', 'DESC')
+          .addOrderBy('property.createdAt', 'DESC');
+        break;
+    }
+
+    // Add pagination
+    queryBuilder
+      .take(Number(limit))
+      .skip((Number(page) - 1) * Number(limit));
+
+    // Execute query
+    console.log('🔍 Executing query...');
+    const [properties, total] = await queryBuilder.getManyAndCount();
+    console.log(`✅ Found ${properties.length} properties out of ${total} total`);
+
+    // Get property IDs for batch photo query (only if we have properties)
+    let photoMap = new Map();
+    if (properties.length > 0) {
+      const propertyIds = properties.map(p => p.id);
+      
+      // Load primary photos for all properties in one query
+      const primaryPhotos = await AppDataSource.getRepository('PropertyPhoto')
+        .find({
+          where: { 
+            propertyId: In(propertyIds), 
+            isPrimary: true 
+          },
+          select: ['propertyId', 'filePath']
+        });
+      
+      // Create a map for quick lookup
+      photoMap = new Map(primaryPhotos.map(photo => [photo.propertyId, photo.filePath]));
+    }
     
-    // Get property IDs for batch photo query
-    const propertyIds = properties.map(p => p.id);
-    
-    // Load primary photos for all properties in one query
-    const primaryPhotos = await AppDataSource.getRepository('PropertyPhoto')
-      .find({
-        where: { 
-          propertyId: In(propertyIds), 
-          isPrimary: true 
-        },
-        select: ['propertyId', 'filePath']
-      });
-    
-    // Create a map for quick lookup
-    const photoMap = new Map(primaryPhotos.map(photo => [photo.propertyId, photo.filePath]));
-    
-    // Build response
+    // Build optimized response - no complex relations loading
     const propertiesWithPhotos = properties.map(property => ({
       id: property.id,
       uuid: property.uuid,
@@ -746,7 +1042,14 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       storageType: property.storageType,
       isFeatured: property.isFeatured,
       createdAt: property.createdAt,
+      updatedAt: property.updatedAt,
       street: property.street,
+      contactName: property.contactName,
+      contactPhone: property.contactPhone,
+      contactEmail: property.contactEmail,
+      viewCount: property.viewCount,
+      favoriteCount: property.favoriteCount,
+      inquiryCount: property.inquiryCount,
       city: property.city?.nameEnglish || property.city?.nameGeorgian || '',
       cityData: {
         id: property.city?.id,
@@ -761,18 +1064,12 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         nameRu: property.areaData.nameRu
       } : null,
       district: property.areaData?.nameKa || '',
-      user: {
-        id: property.user.id,
-        fullName: property.user.fullName,
-        email: property.user.email,
-        phone: property.user.phone
-      },
       photos: photoMap.get(property.id) ? [photoMap.get(property.id)] : [],
-      // Include relation arrays for client-side filtering
-      features: property.features || [],
-      advantages: property.advantages || [],
-      furnitureAppliances: property.furnitureAppliances || [],
-      tags: property.tags || []
+      // Empty arrays for compatibility - relations removed for performance
+      features: [],
+      advantages: [],
+      furnitureAppliances: [],
+      tags: []
     }));
     
     res.status(200).json({
