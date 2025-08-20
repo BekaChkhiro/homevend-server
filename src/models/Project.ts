@@ -125,6 +125,27 @@ export class Project {
   @Column({ name: 'has_square', type: 'boolean', default: false })
   hasSquare!: boolean;
 
+  @Column({ name: 'has_gym', type: 'boolean', default: false })
+  hasGym!: boolean;
+
+  @Column({ name: 'has_swimming_pool', type: 'boolean', default: false })
+  hasSwimmingPool!: boolean;
+
+  @Column({ name: 'has_garden', type: 'boolean', default: false })
+  hasGarden!: boolean;
+
+  @Column({ name: 'has_parking', type: 'boolean', default: false })
+  hasParking!: boolean;
+
+  @Column({ name: 'has_restaurant', type: 'boolean', default: false })
+  hasRestaurant!: boolean;
+
+  @Column({ name: 'has_laundry', type: 'boolean', default: false })
+  hasLaundry!: boolean;
+
+  @Column({ name: 'has_storage', type: 'boolean', default: false })
+  hasStorage!: boolean;
+
   // Within 300 meters
   @Column({ name: 'pharmacy_300m', type: 'boolean', default: false })
   pharmacy300m!: boolean;
@@ -222,6 +243,10 @@ export class Project {
 
   @Column({ name: 'main_door_lock', type: 'boolean', default: false })
   mainDoorLock!: boolean;
+
+  // Maintenance
+  @Column({ name: 'maintenance', type: 'boolean', default: false })
+  maintenance!: boolean;
 
   // Status
   @Column({ name: 'is_active', type: 'boolean', default: true })
