@@ -86,7 +86,7 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response): 
     const { id } = req.params;
     const { role } = req.body;
     
-    if (!['user', 'admin'].includes(role)) {
+    if (!Object.values(UserRoleEnum).includes(role)) {
       res.status(400).json({
         success: false,
         message: 'Invalid role'
@@ -116,7 +116,7 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response): 
       return;
     }
     
-    user.role = role;
+    user.role = role as UserRoleEnum;
     await userRepository.save(user);
     
     res.status(200).json({
