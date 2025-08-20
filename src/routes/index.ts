@@ -11,6 +11,8 @@ import agencyRoutes from './agencies.js';
 import userRoutes from './users.js';
 import projectRoutes from './projects.js';
 import favoritesRoutes from './favorites.js';
+import balanceRoutes from './balance.js';
+import vipRoutes from './vip.js';
 
 const router = Router();
 
@@ -26,5 +28,7 @@ router.use('/agencies', agencyRoutes);
 router.use('/users', userRoutes);
 router.use('/projects', projectRoutes);
 router.use('/favorites', favoritesRoutes);
+router.use('/balance', balanceRoutes);
+router.use('/vip', vipRoutes);
 
 export default router;

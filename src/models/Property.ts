@@ -50,6 +50,13 @@ export enum ConstructionYearEnum {
   AFTER_2000 = 'after-2000'
 }
 
+export enum VipStatusEnum {
+  NONE = 'none',
+  VIP = 'vip',
+  VIP_PLUS = 'vip_plus',
+  SUPER_VIP = 'super_vip'
+}
+
 export enum ConditionEnum {
   EXCELLENT = 'excellent',
   VERY_GOOD = 'very-good',
@@ -358,6 +365,18 @@ export class Property {
   // Photos - One-to-many relationship
   @OneToMany(() => PropertyPhoto, photo => photo.property, { cascade: true })
   photos!: PropertyPhoto[];
+
+  // VIP Status
+  @Column({
+    name: 'vip_status',
+    type: 'enum',
+    enum: VipStatusEnum,
+    default: VipStatusEnum.NONE
+  })
+  vipStatus!: VipStatusEnum;
+
+  @Column({ name: 'vip_expires_at', type: 'timestamp with time zone', nullable: true })
+  vipExpiresAt?: Date;
 
   // Dates
   @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })

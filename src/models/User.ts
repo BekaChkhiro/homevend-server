@@ -77,6 +77,10 @@ export class User {
   @Column({ name: 'last_login_at', type: 'timestamp with time zone', nullable: true })
   lastLoginAt?: Date;
 
+  // Balance for transactions
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0.00 })
+  balance!: number;
+
   // Agency relationship for agents
   @Column({ name: 'agency_id', type: 'integer', nullable: true })
   agencyId?: number;

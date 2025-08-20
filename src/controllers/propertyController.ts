@@ -716,6 +716,8 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         'property.viewCount',
         'property.favoriteCount',
         'property.inquiryCount',
+        'property.vipStatus',
+        'property.vipExpiresAt',
         'city.id',
         'city.code',
         'city.nameGeorgian',
@@ -1065,6 +1067,9 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       } : null,
       district: property.areaData?.nameKa || '',
       photos: photoMap.get(property.id) ? [photoMap.get(property.id)] : [],
+      // VIP status fields
+      vipStatus: property.vipStatus,
+      vipExpiresAt: property.vipExpiresAt,
       // Empty arrays for compatibility - relations removed for performance
       features: [],
       advantages: [],
@@ -1289,6 +1294,9 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
       } : null,
       district: p.areaData?.nameKa || '',
       photos: p.photos ? p.photos.map(photo => photo.filePath) : [],
+      // VIP status fields
+      vipStatus: p.vipStatus,
+      vipExpiresAt: p.vipExpiresAt,
       // Empty arrays for compatibility
       features: [],
       advantages: [],

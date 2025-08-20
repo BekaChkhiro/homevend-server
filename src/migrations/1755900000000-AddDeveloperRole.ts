@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddDeveloperRole1692345678901 implements MigrationInterface {
-    name = 'AddDeveloperRole1692345678901'
+export class AddDeveloperRole1755900000000 implements MigrationInterface {
+    name = 'AddDeveloperRole1755900000000'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // Check if 'developer' value already exists in the enum

@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { AppDataSource } from '../config/database.js';
+import { VipPricing } from '../models/VipPricing.js';
 import { User, UserRoleEnum } from '../models/User.js';
 import { Property } from '../models/Property.js';
 import { Project } from '../models/Project.js';
@@ -1044,6 +1045,91 @@ export const deleteAgencyAsAdmin = async (req: AuthenticatedRequest, res: Respon
     res.status(500).json({
       success: false,
       message: 'Failed to delete agency'
+    });
+  }
+};
+
+// VIP Pricing Management
+
+// Get all VIP pricing
+export const getAllVipPricing = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const vipPricingRepository = AppDataSource.getRepository(VipPricing);
+    
+    const pricing = await vipPricingRepository.find({
+      order: { vipType: 'ASC' }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: pricing.map(p => ({
+        id: p.id,
+        vipType: p.vipType,
+        pricePerDay: parseFloat(p.pricePerDay.toString()),
+        descriptionKa: p.descriptionKa,
+        descriptionEn: p.descriptionEn,
+        features: p.features || [],
+        isActive: p.isActive,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt
+      }))
+    });
+  } catch (error) {
+    console.error('Get VIP pricing error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch VIP pricing'
+    });
+  }
+};
+
+// Update VIP pricing
+export const updateVipPricingAsAdmin = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { pricePerDay, descriptionKa, descriptionEn, features, isActive } = req.body;
+
+    const vipPricingRepository = AppDataSource.getRepository(VipPricing);
+    
+    const pricing = await vipPricingRepository.findOne({
+      where: { id: parseInt(id) }
+    });
+
+    if (!pricing) {
+      res.status(404).json({
+        success: false,
+        message: 'VIP pricing not found'
+      });
+      return;
+    }
+
+    // Update fields
+    if (pricePerDay !== undefined) pricing.pricePerDay = pricePerDay;
+    if (descriptionKa !== undefined) pricing.descriptionKa = descriptionKa;
+    if (descriptionEn !== undefined) pricing.descriptionEn = descriptionEn;
+    if (features !== undefined) pricing.features = features;
+    if (isActive !== undefined) pricing.isActive = isActive;
+
+    await vipPricingRepository.save(pricing);
+
+    res.status(200).json({
+      success: true,
+      message: 'VIP pricing updated successfully',
+      data: {
+        id: pricing.id,
+        vipType: pricing.vipType,
+        pricePerDay: parseFloat(pricing.pricePerDay.toString()),
+        descriptionKa: pricing.descriptionKa,
+        descriptionEn: pricing.descriptionEn,
+        features: pricing.features || [],
+        isActive: pricing.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Update VIP pricing error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update VIP pricing'
     });
   }
 };

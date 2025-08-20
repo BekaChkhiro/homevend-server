@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreateProjectTables1692345678902 implements MigrationInterface {
-    name = 'CreateProjectTables1692345678902'
+export class CreateProjectTables1755900000002 implements MigrationInterface {
+    name = 'CreateProjectTables1755900000002'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // Create project_type_enum
