@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database.js';
 import { User } from '../models/User.js';
 import { Transaction, TransactionTypeEnum, TransactionStatusEnum } from '../models/Transaction.js';
 import { AuthenticatedRequest } from '../types/auth.js';
+import { getDetailedTransactionHistory, getTransactionSummary as getTransactionSummaryUtil, TransactionFilter } from '../utils/transactionQueries.js';
 
 // Get user balance and recent transactions
 export const getUserBalance = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -32,7 +33,7 @@ export const getUserBalance = async (req: AuthenticatedRequest, res: Response): 
       select: [
         'id', 'uuid', 'type', 'status', 'amount', 
         'balanceBefore', 'balanceAfter', 'description', 
-        'paymentMethod', 'createdAt'
+        'paymentMethod', 'createdAt', 'metadata'
       ]
     });
 
@@ -221,6 +222,96 @@ export const getTransactionHistory = async (req: AuthenticatedRequest, res: Resp
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transaction history'
+    });
+  }
+};
+
+// Get detailed transaction history with service information
+export const getDetailedTransactions = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { 
+      propertyId, 
+      purchaseType, 
+      serviceType, 
+      transactionType, 
+      dateFrom, 
+      dateTo,
+      page = 1, 
+      limit = 20 
+    } = req.query;
+    
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    // Build filter from query parameters
+    const filter: TransactionFilter = {
+      userId,
+      limit: Number(limit),
+      offset: (Number(page) - 1) * Number(limit)
+    };
+    
+    if (propertyId) filter.propertyId = Number(propertyId);
+    if (purchaseType) filter.purchaseType = purchaseType as any;
+    if (serviceType) filter.serviceType = serviceType as string;
+    if (transactionType) filter.transactionType = transactionType as TransactionTypeEnum;
+    if (dateFrom) filter.dateFrom = new Date(dateFrom as string);
+    if (dateTo) filter.dateTo = new Date(dateTo as string);
+    
+    // Get detailed transactions
+    const transactions = await getDetailedTransactionHistory(transactionRepository, filter);
+    
+    // Get total count for pagination (without limit/offset)
+    const countFilter = { ...filter };
+    delete countFilter.limit;
+    delete countFilter.offset;
+    const totalTransactions = await getDetailedTransactionHistory(transactionRepository, countFilter);
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        transactions,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: totalTransactions.length,
+          pages: Math.ceil(totalTransactions.length / Number(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get detailed transactions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch detailed transactions'
+    });
+  }
+};
+
+// Get transaction summary statistics
+export const getTransactionSummary = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { propertyId, dateFrom, dateTo } = req.query;
+    
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    // Build filter
+    const filter: TransactionFilter = { userId };
+    if (propertyId) filter.propertyId = Number(propertyId);
+    if (dateFrom) filter.dateFrom = new Date(dateFrom as string);
+    if (dateTo) filter.dateTo = new Date(dateTo as string);
+    
+    const summary = await getTransactionSummaryUtil(transactionRepository, filter);
+    
+    res.status(200).json({
+      success: true,
+      data: summary
+    });
+  } catch (error) {
+    console.error('Get transaction summary error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch transaction summary'
     });
   }
 };

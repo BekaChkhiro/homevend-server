@@ -57,6 +57,14 @@ export enum VipStatusEnum {
   SUPER_VIP = 'super_vip'
 }
 
+export enum ServiceTypeEnum {
+  VIP = 'vip',
+  VIP_PLUS = 'vip_plus',
+  SUPER_VIP = 'super_vip',
+  AUTO_RENEW = 'auto_renew',
+  COLOR_SEPARATION = 'color_separation'
+}
+
 export enum ConditionEnum {
   EXCELLENT = 'excellent',
   VERY_GOOD = 'very-good',
@@ -366,6 +374,10 @@ export class Property {
   @OneToMany(() => PropertyPhoto, photo => photo.property, { cascade: true })
   photos!: PropertyPhoto[];
 
+  // Services relationship
+  @OneToMany('PropertyService', 'property', { cascade: true })
+  services!: any[];
+
   // VIP Status
   @Column({
     name: 'vip_status',
@@ -377,6 +389,19 @@ export class Property {
 
   @Column({ name: 'vip_expires_at', type: 'timestamp with time zone', nullable: true })
   vipExpiresAt?: Date;
+
+  // Additional Services
+  @Column({ name: 'auto_renew_enabled', type: 'boolean', default: false })
+  autoRenewEnabled!: boolean;
+
+  @Column({ name: 'auto_renew_expires_at', type: 'timestamp with time zone', nullable: true })
+  autoRenewExpiresAt?: Date;
+
+  @Column({ name: 'color_separation_enabled', type: 'boolean', default: false })
+  colorSeparationEnabled!: boolean;
+
+  @Column({ name: 'color_separation_expires_at', type: 'timestamp with time zone', nullable: true })
+  colorSeparationExpiresAt?: Date;
 
   // Dates
   @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
