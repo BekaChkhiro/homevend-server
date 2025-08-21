@@ -4,47 +4,29 @@ export class AddProjectAmenityColumns1755700000000 implements MigrationInterface
     name = 'AddProjectAmenityColumns1755700000000'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.addColumn("projects", new TableColumn({
-            name: "has_gym",
-            type: "boolean",
-            default: false
-        }));
+        // Check if columns exist before adding them
+        const table = await queryRunner.getTable("projects");
+        
+        const columnsToAdd = [
+            { name: "has_gym", type: "boolean", default: false },
+            { name: "has_swimming_pool", type: "boolean", default: false },
+            { name: "has_garden", type: "boolean", default: false },
+            { name: "has_parking", type: "boolean", default: false },
+            { name: "has_restaurant", type: "boolean", default: false },
+            { name: "has_laundry", type: "boolean", default: false },
+            { name: "has_storage", type: "boolean", default: false }
+        ];
 
-        await queryRunner.addColumn("projects", new TableColumn({
-            name: "has_swimming_pool",
-            type: "boolean",
-            default: false
-        }));
-
-        await queryRunner.addColumn("projects", new TableColumn({
-            name: "has_garden",
-            type: "boolean",
-            default: false
-        }));
-
-        await queryRunner.addColumn("projects", new TableColumn({
-            name: "has_parking",
-            type: "boolean",
-            default: false
-        }));
-
-        await queryRunner.addColumn("projects", new TableColumn({
-            name: "has_restaurant",
-            type: "boolean",
-            default: false
-        }));
-
-        await queryRunner.addColumn("projects", new TableColumn({
-            name: "has_laundry",
-            type: "boolean",
-            default: false
-        }));
-
-        await queryRunner.addColumn("projects", new TableColumn({
-            name: "has_storage",
-            type: "boolean",
-            default: false
-        }));
+        for (const columnDef of columnsToAdd) {
+            const existingColumn = table?.findColumnByName(columnDef.name);
+            if (!existingColumn) {
+                await queryRunner.addColumn("projects", new TableColumn({
+                    name: columnDef.name,
+                    type: columnDef.type,
+                    default: columnDef.default
+                }));
+            }
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

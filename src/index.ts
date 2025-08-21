@@ -13,6 +13,7 @@ import routes from './routes/index.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { sanitizeInput, preventSQLInjection } from './middleware/security.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
+import { initializeScheduler } from './utils/scheduler.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -72,6 +73,9 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await connectDB();
+    
+    // Initialize scheduled tasks after database connection
+    initializeScheduler();
     
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);

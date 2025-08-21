@@ -13,6 +13,9 @@ import projectRoutes from './projects.js';
 import favoritesRoutes from './favorites.js';
 import balanceRoutes from './balance.js';
 import vipRoutes from './vip.js';
+import serviceRoutes from './services.js';
+import autoRenewalRoutes from './autoRenewal.js';
+import serviceExpirationRoutes from './serviceExpiration.js';
 
 const router = Router();
 
@@ -30,5 +33,8 @@ router.use('/projects', projectRoutes);
 router.use('/favorites', favoritesRoutes);
 router.use('/balance', balanceRoutes);
 router.use('/vip', vipRoutes);
+router.use('/services', serviceRoutes);
+router.use('/auto-renewal', autoRenewalRoutes);
+router.use('/service-expiration', serviceExpirationRoutes);
 
 export default router;

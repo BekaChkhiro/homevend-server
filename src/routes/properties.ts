@@ -5,7 +5,9 @@ import {
   getPropertyById,
   getUserProperties,
   updateProperty, 
-  deleteProperty
+  deleteProperty,
+  getPropertyServiceStatus,
+  testEndpoint
 } from '../controllers/propertyController.js';
 import { getPropertiesByUserId } from '../controllers/userController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
@@ -16,6 +18,7 @@ const router = Router();
 
 // Public routes (no authentication required)
 router.get('/', getProperties);
+router.get('/test', testEndpoint);
 router.get('/user/:userId', getPropertiesByUserId);
 
 // Specific authenticated routes (must come before /:id)
@@ -29,6 +32,7 @@ router.use(authenticate);
 router.post('/', validate(propertySchema), createProperty);
 router.put('/:id', validate(propertySchema), updateProperty);
 router.patch('/:id', updateProperty); // Allow PATCH without full validation for partial updates
+router.get('/:id/services', getPropertyServiceStatus);
 router.delete('/:id', deleteProperty);
 
 

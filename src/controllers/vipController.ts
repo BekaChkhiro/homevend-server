@@ -5,6 +5,7 @@ import { VipPricing } from '../models/VipPricing.js';
 import { User } from '../models/User.js';
 import { Transaction, TransactionTypeEnum, TransactionStatusEnum } from '../models/Transaction.js';
 import { AuthenticatedRequest } from '../types/auth.js';
+import { createVipStatusTransactionMetadata, createVipTransactionDescription } from '../utils/transactionMetadata.js';
 
 // Get VIP pricing options
 export const getVipPricing = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -165,14 +166,19 @@ export const purchaseVipStatus = async (req: AuthenticatedRequest, res: Response
       amount: totalCost,
       balanceBefore: currentBalance,
       balanceAfter: newBalance,
-      description: `VIP ${vipType.replace('_', '+')} purchase for property "${property.title}" (${days} days)`,
+      description: createVipTransactionDescription(vipType, days, property.title),
       paymentMethod: 'balance',
-      metadata: {
-        propertyId: propertyId,
-        vipType: vipType,
-        days: days,
-        pricePerDay: pricePerDay
-      }
+      metadata: createVipStatusTransactionMetadata(
+        propertyId,
+        property.title,
+        vipType,
+        days,
+        pricePerDay,
+        totalCost,
+        newExpiresAt,
+        property.vipStatus,
+        property.vipExpiresAt
+      )
     });
 
     await transactionRepository.save(transaction);

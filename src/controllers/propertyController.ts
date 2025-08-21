@@ -10,6 +10,7 @@ import { PropertyPhoto } from '../models/PropertyPhoto.js';
 import { User } from '../models/User.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 import { FindManyOptions, Like, ILike, In, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { getServiceExpirationInfo, getActiveServiceTypes } from '../utils/serviceExpiration.js';
 
 export const createProperty = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -718,6 +719,10 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         'property.inquiryCount',
         'property.vipStatus',
         'property.vipExpiresAt',
+        'property.autoRenewEnabled',
+        'property.autoRenewExpiresAt',
+        'property.colorSeparationEnabled',
+        'property.colorSeparationExpiresAt',
         'city.id',
         'city.code',
         'city.nameGeorgian',
@@ -977,6 +982,33 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     console.log('🔍 Executing query...');
     const [properties, total] = await queryBuilder.getManyAndCount();
     console.log(`✅ Found ${properties.length} properties out of ${total} total`);
+    
+    // Debug: Check what the database is actually returning
+    if (properties.length > 0) {
+      const firstProperty = properties[0] as any;
+      console.log('🎨 Database raw property keys:', Object.keys(firstProperty));
+      console.log('🎨 Database values for service fields:', {
+        id: firstProperty.id,
+        colorSeparationEnabled: firstProperty.colorSeparationEnabled,
+        colorSeparationExpiresAt: firstProperty.colorSeparationExpiresAt,
+        autoRenewEnabled: firstProperty.autoRenewEnabled,
+        autoRenewExpiresAt: firstProperty.autoRenewExpiresAt,
+        vipStatus: firstProperty.vipStatus,
+        vipExpiresAt: firstProperty.vipExpiresAt
+      });
+    }
+    
+    // Debug: Log raw properties data to see what fields are available
+    if (properties.length > 0) {
+      console.log('🎨 Raw property object keys:', Object.keys(properties[0]));
+      console.log('🎨 Color separation fields check:', {
+        id: properties[0].id,
+        colorSeparationEnabled: (properties[0] as any).colorSeparationEnabled,
+        colorSeparationExpiresAt: (properties[0] as any).colorSeparationExpiresAt,
+        autoRenewEnabled: (properties[0] as any).autoRenewEnabled,
+        autoRenewExpiresAt: (properties[0] as any).autoRenewExpiresAt
+      });
+    }
 
     // Get property IDs for batch photo query (only if we have properties)
     let photoMap = new Map();
@@ -1070,6 +1102,13 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       // VIP status fields
       vipStatus: property.vipStatus,
       vipExpiresAt: property.vipExpiresAt,
+      // TEST FIELD TO VERIFY CHANGES - UPDATED RIGHT NOW
+      debugTestField: 'UPDATED_RIGHT_NOW_' + Date.now(),
+      // Additional service fields
+      autoRenewEnabled: property.autoRenewEnabled || false,
+      autoRenewExpiresAt: property.autoRenewExpiresAt || null,
+      colorSeparationEnabled: property.colorSeparationEnabled || false,
+      colorSeparationExpiresAt: property.colorSeparationExpiresAt || null,
       // Empty arrays for compatibility - relations removed for performance
       features: [],
       advantages: [],
@@ -1700,6 +1739,85 @@ export const deleteProperty = async (req: AuthenticatedRequest, res: Response): 
     res.status(500).json({
       success: false,
       message: 'Failed to delete property'
+    });
+  }
+};
+
+// Get property service status
+export const testEndpoint = async (req: Request, res: Response): Promise<void> => {
+  console.log('🚀 TEST ENDPOINT CALLED');
+  res.json({ success: true, message: 'Test endpoint working', testField: 'TEST_VALUE' });
+};
+
+export const getPropertyServiceStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const propertyRepository = AppDataSource.getRepository(Property);
+    
+    const property = await propertyRepository.findOne({
+      where: { id: parseInt(id) },
+      select: [
+        'id', 'title', 'userId',
+        'vipStatus', 'vipExpiresAt',
+        'autoRenewEnabled', 'autoRenewExpiresAt',
+        'colorSeparationEnabled', 'colorSeparationExpiresAt'
+      ]
+    });
+    
+    if (!property) {
+      res.status(404).json({
+        success: false,
+        message: 'Property not found'
+      });
+      return;
+    }
+    
+    // Check ownership for non-admin users
+    if (property.userId !== req.user!.id && req.user!.role !== 'admin') {
+      res.status(403).json({
+        success: false,
+        message: 'Not authorized to view this property\'s services'
+      });
+      return;
+    }
+    
+    const now = new Date();
+    const serviceInfo = getServiceExpirationInfo(property);
+    const activeServices = getActiveServiceTypes(property);
+    
+    // Check VIP status
+    const vipInfo = property.vipExpiresAt && property.vipExpiresAt > now ? {
+      isActive: true,
+      vipType: property.vipStatus,
+      expiresAt: property.vipExpiresAt,
+      daysRemaining: Math.ceil((property.vipExpiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+    } : {
+      isActive: false,
+      vipType: 'none',
+      expiresAt: null,
+      daysRemaining: 0
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        propertyId: property.id,
+        title: property.title,
+        vip: vipInfo,
+        services: {
+          autoRenew: serviceInfo.autoRenew,
+          colorSeparation: serviceInfo.colorSeparation
+        },
+        activeServiceTypes: activeServices,
+        hasAnyActiveService: activeServices.length > 0 || vipInfo.isActive
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get property service status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get property service status'
     });
   }
 };

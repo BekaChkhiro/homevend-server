@@ -13,6 +13,7 @@ import { User } from './User.js';
 export enum TransactionTypeEnum {
   TOP_UP = 'top_up',
   VIP_PURCHASE = 'vip_purchase',
+  SERVICE_PURCHASE = 'service_purchase',
   FEATURE_PURCHASE = 'feature_purchase',
   PROPERTY_POST = 'property_post',
   PROJECT_POST = 'project_post',

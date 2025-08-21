@@ -30,10 +30,14 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
 };
 
 export const getProperties = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  // TESTING - THIS SHOULD BREAK THE API
+  throw new Error('NESTED FILE BEING USED - TESTING ERROR');
   try {
+    console.log('🔍 getProperties called with filters (CORRECT FILE):', req.query);
+    
     const {
       page = 1,
-      limit = 10,
+      limit = 16,
       city,
       propertyType,
       dealType,
@@ -56,18 +60,69 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       take: Number(limit),
       skip: (Number(page) - 1) * Number(limit),
       order: { createdAt: 'DESC' },
-      relations: ['user']
+      relations: ['user', 'city', 'areaData']
     };
     
     const [properties, total] = await propertyRepository.findAndCount(options);
     
+    console.log('✅ Found properties:', properties.length);
+    
+    const mappedProperties = properties.map(p => ({
+      id: p.id,
+      uuid: p.uuid,
+      title: p.title,
+      propertyType: p.propertyType,
+      dealType: p.dealType,
+      area: p.area,
+      totalPrice: p.totalPrice,
+      pricePerSqm: p.pricePerSqm,
+      currency: p.currency || 'GEL',
+      rooms: p.rooms,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      street: p.street,
+      city: p.city?.nameEnglish || p.city?.nameGeorgian || '',
+      cityData: p.city ? {
+        id: p.city.id,
+        code: p.city.code,
+        nameGeorgian: p.city.nameGeorgian,
+        nameEnglish: p.city.nameEnglish
+      } : null,
+      areaData: p.areaData ? {
+        id: p.areaData.id,
+        nameKa: p.areaData.nameKa,
+        nameEn: p.areaData.nameEn
+      } : null,
+      district: p.areaData?.nameKa || '',
+      vipStatus: p.vipStatus,
+      vipExpiresAt: p.vipExpiresAt,
+      // Service fields - explicitly included
+      colorSeparationEnabled: p.colorSeparationEnabled || false,
+      colorSeparationExpiresAt: p.colorSeparationExpiresAt || null,
+      autoRenewEnabled: p.autoRenewEnabled || false,
+      autoRenewExpiresAt: p.autoRenewExpiresAt || null,
+      // Other fields
+      isFeatured: p.isFeatured,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      contactName: p.contactName,
+      contactPhone: p.contactPhone,
+      contactEmail: p.contactEmail,
+      viewCount: p.viewCount || 0,
+      favoriteCount: p.favoriteCount || 0,
+      inquiryCount: p.inquiryCount || 0,
+      photos: [],
+      features: [],
+      advantages: [],
+      furnitureAppliances: [],
+      tags: [],
+      user: { id: p.user.id, fullName: p.user.fullName, email: p.user.email }
+    }));
+    
     res.status(200).json({
       success: true,
       data: {
-        properties: properties.map(p => ({
-          ...p,
-          user: { id: p.user.id, fullName: p.user.fullName, email: p.user.email }
-        })),
+        properties: mappedProperties,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -278,4 +333,4 @@ export const approveProperty = async (req: AuthenticatedRequest, res: Response):
       message: 'Failed to update property status'
     });
   }
-};
+};/* TEST COMMENT */
