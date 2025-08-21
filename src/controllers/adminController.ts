@@ -309,10 +309,10 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
       monthlyUsers,
       monthlyProperties
     ] = await Promise.all([
-      userRepository.count({ where: { role: 'user' } }),
-      userRepository.count({ where: { role: 'admin' } }),
-      userRepository.count({ where: { role: 'developer' } }),
-      userRepository.count({ where: { role: 'agency' } }),
+      userRepository.count({ where: { role: UserRoleEnum.USER } }),
+      userRepository.count({ where: { role: UserRoleEnum.ADMIN } }),
+      userRepository.count({ where: { role: UserRoleEnum.DEVELOPER } }),
+      userRepository.count({ where: { role: UserRoleEnum.AGENCY } }),
       propertyRepository.count(),
       projectRepository.count(),
       userRepository.createQueryBuilder('user')
@@ -709,12 +709,23 @@ export const updateProjectAsAdmin = async (req: AuthenticatedRequest, res: Respo
       // Add new pricing
       const pricingEntities = pricing.map((p: any) => 
         projectPricingRepository.create({
-          projectId: project.id,
-          bedrooms: p.bedrooms,
-          minPrice: p.minPrice,
-          maxPrice: p.maxPrice,
-          minArea: p.minArea,
-          maxArea: p.maxArea
+          project: { id: project.id },
+          roomType: p.roomType,
+          numberOfRooms: p.numberOfRooms,
+          totalArea: p.totalArea,
+          livingArea: p.livingArea,
+          balconyArea: p.balconyArea,
+          pricePerSqm: p.pricePerSqm,
+          totalPriceFrom: p.totalPriceFrom,
+          totalPriceTo: p.totalPriceTo,
+          availableUnits: p.availableUnits,
+          totalUnits: p.totalUnits,
+          hasBalcony: p.hasBalcony,
+          hasTerrace: p.hasTerrace,
+          hasLoggia: p.hasLoggia,
+          floorFrom: p.floorFrom,
+          floorTo: p.floorTo,
+          isAvailable: p.isAvailable
         })
       );
       
