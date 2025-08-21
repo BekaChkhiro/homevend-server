@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database.js';
 import { Agency } from '../models/Agency.js';
 import { User, UserRoleEnum } from '../models/User.js';
 import { Property } from '../models/Property.js';
+import { Project } from '../models/Project.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 import { FindManyOptions, ILike } from 'typeorm';
 
@@ -14,62 +15,60 @@ export const getAgencies = async (req: Request, res: Response): Promise<void> =>
       limit = 12,
       search,
       city,
-      isVerified
+      isVerified,
+      role
     } = req.query;
     
     const agencyRepository = AppDataSource.getRepository(Agency);
 
-    const where: any = {
-      isActive: true
-    };
+    let queryBuilder = agencyRepository.createQueryBuilder('agency')
+      .leftJoinAndSelect('agency.owner', 'owner')
+      .where('agency.isActive = :isActive', { isActive: true });
     
     if (search) {
-      where.name = ILike(`%${search}%`);
+      queryBuilder = queryBuilder.andWhere('agency.name ILIKE :search', { search: `%${search}%` });
     }
     
     if (city) {
-      where.cityId = city;
+      queryBuilder = queryBuilder.andWhere('agency.cityId = :city', { city });
     }
     
     if (isVerified !== undefined) {
-      where.isVerified = isVerified === 'true';
+      queryBuilder = queryBuilder.andWhere('agency.isVerified = :isVerified', { isVerified: isVerified === 'true' });
     }
 
-    const options: FindManyOptions<Agency> = {
-      where,
-      take: Number(limit),
-      skip: (Number(page) - 1) * Number(limit),
-      order: { 
-        isVerified: 'DESC',
-        agentCount: 'DESC',
-        createdAt: 'DESC' 
-      },
-      relations: ['owner'],
-      select: {
-        id: true,
-        uuid: true,
-        name: true,
-        description: true,
-        logoUrl: true,
-        phone: true,
-        email: true,
-        website: true,
-        socialMediaUrl: true,
-        address: true,
-        isVerified: true,
-        agentCount: true,
-        propertyCount: true,
-        totalSales: true,
-        createdAt: true,
-        owner: {
-          id: true,
-          fullName: true,
-          email: true
-        }
-      }
-    };
+    if (role) {
+      queryBuilder = queryBuilder.andWhere('owner.role = :role', { role });
+    }
 
-    const [agencies, total] = await agencyRepository.findAndCount(options);
+    queryBuilder = queryBuilder
+      .orderBy('agency.isVerified', 'DESC')
+      .addOrderBy('agency.agentCount', 'DESC')
+      .addOrderBy('agency.createdAt', 'DESC')
+      .skip((Number(page) - 1) * Number(limit))
+      .take(Number(limit))
+      .select([
+        'agency.id',
+        'agency.uuid', 
+        'agency.name',
+        'agency.description',
+        'agency.logoUrl',
+        'agency.phone',
+        'agency.email', 
+        'agency.website',
+        'agency.socialMediaUrl',
+        'agency.address',
+        'agency.isVerified',
+        'agency.agentCount',
+        'agency.propertyCount', 
+        'agency.totalSales',
+        'agency.createdAt',
+        'owner.id',
+        'owner.fullName',
+        'owner.email'
+      ]);
+
+    const [agencies, total] = await queryBuilder.getManyAndCount();
     
     res.status(200).json({
       success: true,
@@ -100,34 +99,19 @@ export const getAgencyById = async (req: Request, res: Response): Promise<void> 
     const userRepository = AppDataSource.getRepository(User);
     const propertyRepository = AppDataSource.getRepository(Property);
     
-    const agency = await agencyRepository.findOne({
-      where: { id: Number(id), isActive: true },
-      relations: ['owner'],
-      select: {
-        id: true,
-        uuid: true,
-        name: true,
-        description: true,
-        logoUrl: true,
-        bannerUrl: true,
-        phone: true,
-        email: true,
-        website: true,
-        socialMediaUrl: true,
-        address: true,
-        isVerified: true,
-        agentCount: true,
-        propertyCount: true,
-        totalSales: true,
-        createdAt: true,
-        owner: {
-          id: true,
-          fullName: true,
-          email: true,
-          phone: true
-        }
-      }
-    });
+    const agency = await agencyRepository
+      .createQueryBuilder('agency')
+      .leftJoinAndSelect('agency.owner', 'owner')
+      .where('agency.uuid = :uuid AND agency.isActive = :isActive', { uuid: id, isActive: true })
+      .select([
+        'agency.id', 'agency.uuid', 'agency.name', 'agency.description',
+        'agency.logoUrl', 'agency.bannerUrl', 'agency.phone', 'agency.email',
+        'agency.website', 'agency.socialMediaUrl', 'agency.address',
+        'agency.isVerified', 'agency.agentCount', 'agency.propertyCount',
+        'agency.totalSales', 'agency.createdAt',
+        'owner.id', 'owner.fullName', 'owner.email', 'owner.phone', 'owner.role'
+      ])
+      .getOne();
     
     if (!agency) {
       res.status(404).json({
@@ -135,6 +119,34 @@ export const getAgencyById = async (req: Request, res: Response): Promise<void> 
         message: 'Agency not found'
       });
       return;
+    }
+    
+    // If this is a developer, fetch their projects and properties
+    let projects = [];
+    let properties = [];
+    
+    if (agency.owner.role === 'developer') {
+      // Fetch projects
+      const projectRepository = AppDataSource.getRepository(Project);
+      projects = await projectRepository.find({
+        where: { developerId: agency.owner.id },
+        select: [
+          'id', 'uuid', 'projectName', 'description', 'projectType', 
+          'deliveryStatus', 'deliveryDate', 'totalApartments', 
+          'numberOfBuildings', 'numberOfFloors', 'createdAt'
+        ]
+      });
+      
+      // Fetch properties  
+      properties = await propertyRepository.find({
+        where: { userId: agency.owner.id },
+        select: [
+          'id', 'title', 'totalPrice', 'propertyType', 'dealType',
+          'area', 'rooms', 'street', 'createdAt'
+        ],
+        relations: ['photos'],
+        take: 20
+      });
     }
     
     // Fetch agents separately due to lazy loading
@@ -226,9 +238,10 @@ export const getAgencyById = async (req: Request, res: Response): Promise<void> 
     
     const agencyWithAgentsAndProperties = {
       ...agency,
-      properties: agencyProperties,
+      properties: agency.owner.role === 'developer' ? properties : agencyProperties,
+      projects: agency.owner.role === 'developer' ? projects : [],
       agents: agentsWithProperties,
-      allProperties: allProperties
+      allProperties: agency.owner.role === 'developer' ? properties : allProperties
     };
     
     res.status(200).json({
