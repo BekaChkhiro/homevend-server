@@ -10,6 +10,7 @@ import { ProjectPricing } from '../models/ProjectPricing.js';
 import { ProjectAmenity, AmenityDistanceEnum } from '../models/ProjectAmenity.js';
 import { Agency } from '../models/Agency.js';
 import { ServicePricing } from '../models/ServicePricing.js';
+import { ServiceTypeEnum } from '../models/Property.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 
 export const getAllUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -1225,12 +1226,12 @@ export const ensureFreeServiceExists = async (): Promise<void> => {
     const servicePricingRepository = AppDataSource.getRepository(ServicePricing);
     
     const freeService = await servicePricingRepository.findOne({
-      where: { serviceType: 'free' }
+      where: { serviceType: ServiceTypeEnum.FREE }
     });
     
     if (!freeService) {
       const newFreeService = servicePricingRepository.create({
-        serviceType: 'free',
+        serviceType: ServiceTypeEnum.FREE,
         nameKa: 'უფასო განცხადება',
         nameEn: 'Free Listing',
         pricePerDay: 0,

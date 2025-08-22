@@ -62,7 +62,8 @@ export enum ServiceTypeEnum {
   VIP_PLUS = 'vip_plus',
   SUPER_VIP = 'super_vip',
   AUTO_RENEW = 'auto_renew',
-  COLOR_SEPARATION = 'color_separation'
+  COLOR_SEPARATION = 'color_separation',
+  FREE = 'free'
 }
 
 export enum ConditionEnum {

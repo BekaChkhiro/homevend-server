@@ -13,7 +13,8 @@ const favoritesRateLimiter = createRateLimiter({
   windowMs: 1 * 60 * 1000, // 1 minute window
   max: 10, // Allow only 10 requests per minute per user
   message: 'Too many favorites requests. Please wait before trying again.',
-  keyGenerator: (req) => `favorites:${req.user?.id || req.ip}`
+  // Cast to any to access req.user installed by authenticate middleware
+  keyGenerator: (req) => `favorites:${(req as any).user?.id || req.ip}`
 });
 
 router.use(favoritesRateLimiter);
