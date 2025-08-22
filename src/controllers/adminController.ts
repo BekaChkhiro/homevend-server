@@ -9,6 +9,7 @@ import { Area } from '../models/Area.js';
 import { ProjectPricing } from '../models/ProjectPricing.js';
 import { ProjectAmenity, AmenityDistanceEnum } from '../models/ProjectAmenity.js';
 import { Agency } from '../models/Agency.js';
+import { ServicePricing } from '../models/ServicePricing.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 
 export const getAllUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -402,18 +403,56 @@ export const getAllProjects = async (req: AuthenticatedRequest, res: Response): 
     const { page = 1, limit = 10 } = req.query;
     
     const projectRepository = AppDataSource.getRepository(Project);
+    const userRepository = AppDataSource.getRepository(User);
     
     const [projects, total] = await projectRepository.findAndCount({
       take: Number(limit),
       skip: (Number(page) - 1) * Number(limit),
       order: { createdAt: 'DESC' },
-      relations: ['developer', 'city', 'areaData']
+      relations: ['city', 'areaData']
     });
+    
+    // Fetch developer info for each project
+    const projectsWithDeveloper = await Promise.all(
+      projects.map(async (project) => {
+        let developer = null;
+        if (project.developerId) {
+          const user = await userRepository.findOne({
+            where: { id: project.developerId, role: UserRoleEnum.DEVELOPER },
+            select: ['id', 'fullName', 'email']
+          });
+          if (user) {
+            developer = {
+              id: user.id,
+              fullName: user.fullName,
+              email: user.email
+            };
+          }
+        }
+        
+        // Format complete address
+        const fullAddress = [project.street, project.streetNumber].filter(Boolean).join(' ');
+        const locationParts = [
+          project.areaData?.nameKa || project.areaData?.nameEn,
+          project.city?.nameGeorgian || project.city?.nameEnglish
+        ].filter(Boolean);
+        const fullLocation = locationParts.length > 0 ? locationParts.join(', ') : '';
+        
+        return {
+          ...project,
+          developer,
+          developerId: project.developerId, // Ensure developerId is explicitly included
+          address: fullAddress || project.street || '',
+          location: fullLocation,
+          fullAddress: fullAddress ? `${fullAddress}, ${fullLocation}` : fullLocation
+        };
+      })
+    );
     
     res.status(200).json({
       success: true,
       data: {
-        projects,
+        projects: projectsWithDeveloper,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -436,10 +475,11 @@ export const getProjectById = async (req: AuthenticatedRequest, res: Response): 
   try {
     const { id } = req.params;
     const projectRepository = AppDataSource.getRepository(Project);
+    const userRepository = AppDataSource.getRepository(User);
     
     const project = await projectRepository.findOne({
       where: { id: parseInt(id) },
-      relations: ['developer', 'city', 'areaData', 'pricing', 'amenities']
+      relations: ['city', 'areaData', 'pricing', 'amenities']
     });
     
     if (!project) {
@@ -475,9 +515,41 @@ export const getProjectById = async (req: AuthenticatedRequest, res: Response): 
       });
     }
 
+    // Fetch developer info
+    let developer = null;
+    if (project.developerId) {
+      const user = await userRepository.findOne({
+        where: { id: project.developerId, role: UserRoleEnum.DEVELOPER },
+        select: ['id', 'fullName', 'email']
+      });
+      if (user) {
+        developer = {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email
+        };
+      }
+    }
+
+    // Format complete address
+    const fullAddress = [project.street, project.streetNumber].filter(Boolean).join(' ');
+    const locationParts = [
+      project.areaData?.nameKa || project.areaData?.nameEn,
+      project.city?.nameGeorgian || project.city?.nameEnglish
+    ].filter(Boolean);
+    const fullLocation = locationParts.length > 0 ? locationParts.join(', ') : '';
+
     res.status(200).json({
-      ...project,
-      customAmenities
+      success: true,
+      data: {
+        ...project,
+        developer,
+        developerId: project.developerId,
+        address: fullAddress || project.street || '',
+        location: fullLocation,
+        fullAddress: fullAddress ? `${fullAddress}, ${fullLocation}` : fullLocation,
+        customAmenities
+      }
     });
   } catch (error) {
     console.error('Get project by ID error:', error);
@@ -1141,6 +1213,140 @@ export const updateVipPricingAsAdmin = async (req: AuthenticatedRequest, res: Re
     res.status(500).json({
       success: false,
       message: 'Failed to update VIP pricing'
+    });
+  }
+};
+
+// Service Pricing Management Functions
+
+// Ensure free service exists
+export const ensureFreeServiceExists = async (): Promise<void> => {
+  try {
+    const servicePricingRepository = AppDataSource.getRepository(ServicePricing);
+    
+    const freeService = await servicePricingRepository.findOne({
+      where: { serviceType: 'free' }
+    });
+    
+    if (!freeService) {
+      const newFreeService = servicePricingRepository.create({
+        serviceType: 'free',
+        nameKa: 'უფასო განცხადება',
+        nameEn: 'Free Listing',
+        pricePerDay: 0,
+        descriptionKa: 'სტანდარტული უფასო განცხადება',
+        descriptionEn: 'Standard free listing',
+        features: ['სტანდარტული ხილვადობა', 'ძირითადი ინფორმაცია'],
+        category: 'vip',
+        isActive: true
+      });
+      
+      await servicePricingRepository.save(newFreeService);
+      console.log('Free service created successfully');
+    }
+  } catch (error) {
+    console.error('Error ensuring free service exists:', error);
+  }
+};
+
+// Get all service pricing
+export const getAllServicePricing = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    // Ensure free service exists before fetching
+    await ensureFreeServiceExists();
+    
+    const servicePricingRepository = AppDataSource.getRepository(ServicePricing);
+    
+    const pricing = await servicePricingRepository.find({
+      order: { category: 'ASC', serviceType: 'ASC' }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: pricing.map(p => ({
+        id: p.id,
+        serviceType: p.serviceType,
+        nameKa: p.nameKa,
+        nameEn: p.nameEn,
+        pricePerDay: parseFloat(p.pricePerDay.toString()),
+        descriptionKa: p.descriptionKa,
+        descriptionEn: p.descriptionEn,
+        features: p.features || [],
+        category: p.category,
+        isActive: p.isActive,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt
+      }))
+    });
+  } catch (error) {
+    console.error('Get service pricing error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch service pricing'
+    });
+  }
+};
+
+// Update service pricing
+export const updateServicePricing = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const {
+      pricePerDay,
+      nameKa,
+      nameEn,
+      descriptionKa,
+      descriptionEn,
+      features,
+      isActive
+    } = req.body;
+
+    const servicePricingRepository = AppDataSource.getRepository(ServicePricing);
+    
+    const pricing = await servicePricingRepository.findOne({
+      where: { id: parseInt(id) }
+    });
+
+    if (!pricing) {
+      res.status(404).json({
+        success: false,
+        message: 'Service pricing not found'
+      });
+      return;
+    }
+
+    // Update fields
+    if (pricePerDay !== undefined) pricing.pricePerDay = pricePerDay;
+    if (nameKa !== undefined) pricing.nameKa = nameKa;
+    if (nameEn !== undefined) pricing.nameEn = nameEn;
+    if (descriptionKa !== undefined) pricing.descriptionKa = descriptionKa;
+    if (descriptionEn !== undefined) pricing.descriptionEn = descriptionEn;
+    if (features !== undefined) pricing.features = features;
+    if (isActive !== undefined) pricing.isActive = isActive;
+
+    await servicePricingRepository.save(pricing);
+
+    res.status(200).json({
+      success: true,
+      message: 'Service pricing updated successfully',
+      data: {
+        id: pricing.id,
+        serviceType: pricing.serviceType,
+        nameKa: pricing.nameKa,
+        nameEn: pricing.nameEn,
+        pricePerDay: parseFloat(pricing.pricePerDay.toString()),
+        descriptionKa: pricing.descriptionKa,
+        descriptionEn: pricing.descriptionEn,
+        features: pricing.features || [],
+        category: pricing.category,
+        isActive: pricing.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Update service pricing error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update service pricing'
     });
   }
 };

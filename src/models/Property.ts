@@ -12,6 +12,7 @@ import {
   Index
 } from 'typeorm';
 import { User } from './User.js';
+import { Developer } from './Developer.js';
 import { City } from './City.js';
 import { Area } from './Area.js';
 import { Feature } from './Feature.js';
@@ -110,6 +111,14 @@ export class Property {
   @ManyToOne('Project', { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'project_id' })
   project?: any;
+
+  // Developer relationship (optional - properties can belong to developers directly)
+  @Column({ name: 'developer_id', type: 'integer', nullable: true })
+  developerId?: number;
+
+  // @ManyToOne(() => Developer, { onDelete: 'SET NULL' })
+  // @JoinColumn({ name: 'developer_id' })
+  // developer?: Developer;
 
   // Basic Information
   @Column({ type: 'varchar', length: 300, nullable: false })

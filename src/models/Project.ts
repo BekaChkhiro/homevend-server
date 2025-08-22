@@ -39,9 +39,9 @@ export class Project {
   @Column({ name: 'developer_id', type: 'integer', nullable: false })
   developerId!: number;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'developer_id' })
-  developer!: User;
+  // @ManyToOne('Developer', { onDelete: 'CASCADE' })
+  // @JoinColumn({ name: 'developer_id' })
+  // developer!: any;
 
   // Basic Information
   @Column({ name: 'project_name', type: 'varchar', length: 300, nullable: false })

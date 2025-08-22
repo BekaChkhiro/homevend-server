@@ -28,7 +28,6 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.city', 'city')
       .leftJoinAndSelect('project.areaData', 'areaData')
-      .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .where('project.isActive = :isActive', { isActive: true })
       .select([
@@ -36,10 +35,9 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
         'project.street', 'project.streetNumber', 'project.projectType',
         'project.deliveryStatus', 'project.deliveryDate', 'project.numberOfBuildings',
         'project.totalApartments', 'project.numberOfFloors', 'project.viewCount',
-        'project.createdAt',
+        'project.developerId', 'project.createdAt',
         'city.id', 'city.nameGeorgian',
         'areaData.id', 'areaData.nameKa',
-        'developer.id', 'developer.fullName', 'developer.phone',
         'pricing'
       ]);
 
@@ -100,7 +98,6 @@ export const getProjectById = async (req: Request, res: Response): Promise<void>
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.city', 'city')
       .leftJoinAndSelect('project.areaData', 'areaData')
-      .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .leftJoinAndSelect('project.amenities', 'amenities')
       .where('project.id = :id', { id })
@@ -164,7 +161,6 @@ export const getProjectsByDeveloperId = async (req: Request, res: Response): Pro
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.city', 'city')
       .leftJoinAndSelect('project.areaData', 'areaData')
-      .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .where('project.developerId = :developerId', { developerId })
       .andWhere('project.isActive = :isActive', { isActive: true })
@@ -181,11 +177,11 @@ export const getProjectsByDeveloperId = async (req: Request, res: Response): Pro
 
     res.json({
       projects,
-      developer: {
-        id: developer.id,
-        fullName: developer.fullName,
-        email: developer.email
-      },
+      // developer: {
+      //   id: developer.id,
+      //   fullName: developer.fullName,
+      //   email: developer.email
+      // },
       pagination: {
         page: pageNumber,
         limit: limitNumber,
@@ -468,7 +464,6 @@ export const createProject = async (req: AuthenticatedRequest, res: Response): P
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.city', 'city')
       .leftJoinAndSelect('project.areaData', 'areaData')
-      .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .leftJoinAndSelect('project.amenities', 'amenities')
       .where('project.id = :id', { id: savedProject.id })
@@ -643,7 +638,6 @@ export const updateProject = async (req: AuthenticatedRequest, res: Response): P
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.city', 'city')
       .leftJoinAndSelect('project.areaData', 'areaData')
-      .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .leftJoinAndSelect('project.amenities', 'amenities')
       .where('project.id = :id', { id: project.id })

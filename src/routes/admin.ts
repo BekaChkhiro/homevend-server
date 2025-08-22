@@ -16,7 +16,9 @@ import {
   updateAgencyAsAdmin,
   deleteAgencyAsAdmin,
   getAllVipPricing,
-  updateVipPricingAsAdmin
+  updateVipPricingAsAdmin,
+  getAllServicePricing,
+  updateServicePricing
 } from '../controllers/adminController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
@@ -55,5 +57,9 @@ router.delete('/agencies/:id', deleteAgencyAsAdmin);
 // VIP Pricing Management
 router.get('/vip-pricing', getAllVipPricing);
 router.put('/vip-pricing/:id', updateVipPricingAsAdmin);
+
+// Service Pricing Management
+router.get('/service-pricing', getAllServicePricing);
+router.put('/service-pricing/:id', updateServicePricing);
 
 export default router;
