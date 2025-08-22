@@ -8,6 +8,7 @@ import { FurnitureAppliance } from '../models/FurnitureAppliance.js';
 import { Tag } from '../models/Tag.js';
 import { PropertyPhoto } from '../models/PropertyPhoto.js';
 import { User } from '../models/User.js';
+import { PropertyService } from '../models/PropertyService.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 import { FindManyOptions, Like, ILike, In, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 import { getServiceExpirationInfo, getActiveServiceTypes } from '../utils/serviceExpiration.js';
@@ -1273,6 +1274,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
     
     const userId = req.user!.id;
     const propertyRepository = AppDataSource.getRepository(Property);
+    const propertyServiceRepository = AppDataSource.getRepository(PropertyService);
     
     // Only fetch properties created by the current user (agency or regular user)
     const whereCondition = { userId };
@@ -1292,6 +1294,29 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
 
     console.log(`Found ${properties.length} properties`);
     console.log('Sample property projectId:', properties[0]?.projectId);
+    
+    // Fetch active services for all properties
+    const propertyIds = properties.map(p => p.id);
+    const allActiveServices = propertyIds.length > 0 ? await propertyServiceRepository.find({
+      where: {
+        propertyId: In(propertyIds),
+        isActive: true,
+        expiresAt: MoreThanOrEqual(new Date())
+      }
+    }) : [];
+
+    // Group services by property ID
+    const servicesByProperty = allActiveServices.reduce((acc, service) => {
+      if (!acc[service.propertyId]) {
+        acc[service.propertyId] = [];
+      }
+      acc[service.propertyId].push({
+        serviceType: service.serviceType,
+        expiresAt: service.expiresAt,
+        colorCode: service.colorCode
+      });
+      return acc;
+    }, {} as Record<number, any[]>);
     
     const mappedProperties = properties.map(p => ({
       id: p.id,
@@ -1336,6 +1361,8 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
       // VIP status fields
       vipStatus: p.vipStatus,
       vipExpiresAt: p.vipExpiresAt,
+      // Active services for the property
+      services: servicesByProperty[p.id] || [],
       // Empty arrays for compatibility
       features: [],
       advantages: [],

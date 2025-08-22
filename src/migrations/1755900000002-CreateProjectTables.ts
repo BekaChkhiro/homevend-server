@@ -4,14 +4,32 @@ export class CreateProjectTables1755900000002 implements MigrationInterface {
     name = 'CreateProjectTables1755900000002'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        // Create project_type_enum
-        await queryRunner.query(`CREATE TYPE "project_type_enum" AS ENUM('private_house', 'apartment_building')`);
+        // Create project_type_enum if it doesn't exist
+        await queryRunner.query(`
+            DO $$ BEGIN
+                CREATE TYPE "project_type_enum" AS ENUM('private_house', 'apartment_building');
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        `);
         
-        // Create delivery_status_enum
-        await queryRunner.query(`CREATE TYPE "delivery_status_enum" AS ENUM('completed_with_renovation', 'green_frame', 'black_frame', 'white_frame')`);
+        // Create delivery_status_enum if it doesn't exist
+        await queryRunner.query(`
+            DO $$ BEGIN
+                CREATE TYPE "delivery_status_enum" AS ENUM('completed_with_renovation', 'green_frame', 'black_frame', 'white_frame');
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        `);
         
-        // Create room_type_enum
-        await queryRunner.query(`CREATE TYPE "room_type_enum" AS ENUM('studio', 'one_bedroom', 'two_bedroom', 'three_bedroom', 'four_bedroom', 'five_plus_bedroom')`);
+        // Create room_type_enum if it doesn't exist
+        await queryRunner.query(`
+            DO $$ BEGIN
+                CREATE TYPE "room_type_enum" AS ENUM('studio', 'one_bedroom', 'two_bedroom', 'three_bedroom', 'four_bedroom', 'five_plus_bedroom');
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        `);
         
         // Create projects table
         await queryRunner.query(`CREATE TABLE "projects" (

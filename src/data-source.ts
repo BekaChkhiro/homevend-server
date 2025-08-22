@@ -2,23 +2,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { DataSource } from 'typeorm';
-import { User } from './models/User.js';
-import { Property } from './models/Property.js';
-import { District } from './models/District.js';
-import { Area } from './models/Area.js';
-import { PriceStatistic } from './models/PriceStatistic.js';
-import { City } from './models/City.js';
-import { Feature } from './models/Feature.js';
-import { Advantage } from './models/Advantage.js';
-import { FurnitureAppliance } from './models/FurnitureAppliance.js';
-import { Tag } from './models/Tag.js';
-import { PropertyPhoto } from './models/PropertyPhoto.js';
-import { UserFavorite } from './models/UserFavorite.js';
-import { PropertyInquiry } from './models/PropertyInquiry.js';
-import { PropertyView } from './models/PropertyView.js';
-import { Agency } from './models/Agency.js';
-import { Project } from './models/Project.js';
-import { ProjectPricing } from './models/ProjectPricing.js';
 
 // Create a new DataSource instance with proper typing
 // Use DATABASE_URL if available, otherwise use individual parameters
@@ -42,23 +25,29 @@ export default new DataSource({
   synchronize: false, // Always use migrations instead
   logging: false,
   entities: [
-    User, 
-    Property, 
-    District, 
-    Area,
-    PriceStatistic, 
-    City, 
-    Feature, 
-    Advantage, 
-    FurnitureAppliance, 
-    Tag, 
-    PropertyPhoto, 
-    UserFavorite, 
-    PropertyInquiry, 
-    PropertyView,
-    Agency,
-    Project,
-    ProjectPricing
+    'dist/models/User.js',
+    'dist/models/Property.js',
+    'dist/models/District.js',
+    'dist/models/Area.js',
+    'dist/models/PriceStatistic.js',
+    'dist/models/City.js',
+    'dist/models/Feature.js',
+    'dist/models/Advantage.js',
+    'dist/models/FurnitureAppliance.js',
+    'dist/models/Tag.js',
+    'dist/models/PropertyPhoto.js',
+    'dist/models/UserFavorite.js',
+    'dist/models/PropertyInquiry.js',
+    'dist/models/PropertyView.js',
+    'dist/models/Agency.js',
+    'dist/models/Developer.js',
+    'dist/models/Project.js',
+    'dist/models/ProjectPricing.js',
+    'dist/models/ProjectAmenity.js',
+    'dist/models/VipPricing.js',
+    'dist/models/PropertyVipService.js',
+    'dist/models/ServicePricing.js',
+    'dist/models/Transaction.js'
   ],
   migrations: ['dist/migrations/*.js'],
   subscribers: ['dist/subscribers/*.js']

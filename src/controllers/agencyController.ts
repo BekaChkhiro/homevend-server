@@ -23,7 +23,7 @@ export const getAgencies = async (req: Request, res: Response): Promise<void> =>
 
     let queryBuilder = agencyRepository.createQueryBuilder('agency')
       .leftJoinAndSelect('agency.owner', 'owner')
-      .where('agency.isActive = :isActive', { isActive: true });
+      .where('agency.isActive = :isActive AND owner.role = :role', { isActive: true, role: 'agency' });
     
     if (search) {
       queryBuilder = queryBuilder.andWhere('agency.name ILIKE :search', { search: `%${search}%` });
@@ -37,9 +37,7 @@ export const getAgencies = async (req: Request, res: Response): Promise<void> =>
       queryBuilder = queryBuilder.andWhere('agency.isVerified = :isVerified', { isVerified: isVerified === 'true' });
     }
 
-    if (role) {
-      queryBuilder = queryBuilder.andWhere('owner.role = :role', { role });
-    }
+    // Role filtering is now handled in the main where clause
 
     queryBuilder = queryBuilder
       .orderBy('agency.isVerified', 'DESC')
@@ -91,7 +89,7 @@ export const getAgencies = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// Get agency by ID
+// Get agency by ID (supports both numeric ID and UUID)
 export const getAgencyById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -99,10 +97,20 @@ export const getAgencyById = async (req: Request, res: Response): Promise<void> 
     const userRepository = AppDataSource.getRepository(User);
     const propertyRepository = AppDataSource.getRepository(Property);
     
-    const agency = await agencyRepository
+    // Check if the ID is numeric or UUID
+    const isNumericId = /^\d+$/.test(id);
+    
+    let queryBuilder = agencyRepository
       .createQueryBuilder('agency')
-      .leftJoinAndSelect('agency.owner', 'owner')
-      .where('agency.uuid = :uuid AND agency.isActive = :isActive', { uuid: id, isActive: true })
+      .leftJoinAndSelect('agency.owner', 'owner');
+    
+    if (isNumericId) {
+      queryBuilder = queryBuilder.where('agency.id = :id AND agency.isActive = :isActive', { id: parseInt(id), isActive: true });
+    } else {
+      queryBuilder = queryBuilder.where('agency.uuid = :uuid AND agency.isActive = :isActive', { uuid: id, isActive: true });
+    }
+    
+    const agency = await queryBuilder
       .select([
         'agency.id', 'agency.uuid', 'agency.name', 'agency.description',
         'agency.logoUrl', 'agency.bannerUrl', 'agency.phone', 'agency.email',
