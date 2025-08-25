@@ -4,6 +4,8 @@ import { User } from '../models/User.js';
 import { Transaction, TransactionTypeEnum, TransactionStatusEnum } from '../models/Transaction.js';
 import { AuthenticatedRequest } from '../types/auth.js';
 import { getDetailedTransactionHistory, getTransactionSummary as getTransactionSummaryUtil, TransactionFilter } from '../utils/transactionQueries.js';
+import { FlittPaymentService } from '../services/payments/FlittPaymentService.js';
+import { PaymentProviderEnum, getEnabledPaymentProviders, getPaymentProvider } from '../services/payments/PaymentProviders.js';
 
 // Get user balance and recent transactions
 export const getUserBalance = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -74,37 +76,69 @@ export const getUserBalance = async (req: AuthenticatedRequest, res: Response): 
   }
 };
 
-// Process top-up (for testing - simplified)
-export const processTopUp = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const queryRunner = AppDataSource.createQueryRunner();
-  await queryRunner.connect();
-  await queryRunner.startTransaction();
+// Get available payment providers
+export const getPaymentProviders = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const providers = getEnabledPaymentProviders();
+    
+    res.status(200).json({
+      success: true,
+      data: providers
+    });
+  } catch (error) {
+    console.error('Get payment providers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment providers'
+    });
+  }
+};
 
+// Initiate top-up process (creates payment order)
+export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.id;
-    const { amount, paymentMethod = 'test' } = req.body;
+    const { amount, provider = PaymentProviderEnum.TEST } = req.body;
 
     // Validate amount
     const topUpAmount = parseFloat(amount);
-    if (!topUpAmount || topUpAmount <= 0 || topUpAmount > 10000) {
+    if (!topUpAmount || topUpAmount <= 0) {
       res.status(400).json({
         success: false,
-        message: 'Invalid amount. Must be between 0.01 and 10,000'
+        message: 'Invalid amount'
       });
       return;
     }
 
-    const userRepository = queryRunner.manager.getRepository(User);
-    const transactionRepository = queryRunner.manager.getRepository(Transaction);
+    // Get payment provider
+    const paymentProvider = getPaymentProvider(provider);
+    if (!paymentProvider || !paymentProvider.isEnabled) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid or disabled payment provider'
+      });
+      return;
+    }
 
-    // Get current user with balance
+    // Validate amount against provider limits
+    if (topUpAmount < paymentProvider.minAmount || topUpAmount > paymentProvider.maxAmount) {
+      res.status(400).json({
+        success: false,
+        message: `Amount must be between ${paymentProvider.minAmount} and ${paymentProvider.maxAmount} ${paymentProvider.currency}`
+      });
+      return;
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+
+    // Get current user
     const user = await userRepository.findOne({
       where: { id: userId },
       select: ['id', 'fullName', 'email', 'balance']
     });
 
     if (!user) {
-      await queryRunner.rollbackTransaction();
       res.status(404).json({
         success: false,
         message: 'User not found'
@@ -113,65 +147,145 @@ export const processTopUp = async (req: AuthenticatedRequest, res: Response): Pr
     }
 
     const currentBalance = parseFloat(user.balance.toString());
-    const newBalance = currentBalance + topUpAmount;
 
-    // Create transaction record
+    // Create pending transaction
+    const orderId = `topup_${userId}_${Date.now()}`;
     const transaction = transactionRepository.create({
       userId: userId,
       type: TransactionTypeEnum.TOP_UP,
-      status: TransactionStatusEnum.COMPLETED, // For testing, immediately mark as completed
+      status: TransactionStatusEnum.PENDING,
       amount: topUpAmount,
       balanceBefore: currentBalance,
-      balanceAfter: newBalance,
-      description: `Balance top-up via ${paymentMethod}`,
-      paymentMethod: paymentMethod,
-      externalTransactionId: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      balanceAfter: currentBalance, // Will be updated when payment is confirmed
+      description: `Balance top-up via ${paymentProvider.displayName}`,
+      paymentMethod: provider,
+      externalTransactionId: orderId,
       metadata: {
         userAgent: req.headers['user-agent'],
         ipAddress: req.ip,
-        testTransaction: true
+        provider: provider,
+        orderId: orderId
       }
     });
 
     await transactionRepository.save(transaction);
 
-    // Update user balance
-    user.balance = newBalance;
-    await userRepository.save(user);
+    // Handle different payment providers
+    if (provider === PaymentProviderEnum.TEST) {
+      // For test provider, immediately complete the transaction
+      const newBalance = currentBalance + topUpAmount;
+      
+      transaction.status = TransactionStatusEnum.COMPLETED;
+      transaction.balanceAfter = newBalance;
+      transaction.metadata = {
+        ...transaction.metadata,
+        testTransaction: true,
+        completedAt: new Date().toISOString()
+      };
+      
+      await transactionRepository.save(transaction);
+      
+      // Update user balance
+      user.balance = newBalance;
+      await userRepository.save(user);
 
-    await queryRunner.commitTransaction();
-
-    res.status(200).json({
-      success: true,
-      message: 'Top-up processed successfully',
-      data: {
-        transactionId: transaction.uuid,
-        amount: topUpAmount,
-        newBalance: newBalance,
-        transaction: {
-          id: transaction.id,
-          uuid: transaction.uuid,
-          type: transaction.type,
-          status: transaction.status,
+      res.status(200).json({
+        success: true,
+        provider: 'test',
+        message: 'Test payment completed successfully',
+        data: {
+          transactionId: transaction.uuid,
           amount: topUpAmount,
-          balanceBefore: currentBalance,
-          balanceAfter: newBalance,
-          description: transaction.description,
-          paymentMethod: transaction.paymentMethod,
-          createdAt: transaction.createdAt.toISOString()
+          newBalance: newBalance,
+          status: 'completed'
         }
+      });
+    } else if (provider === PaymentProviderEnum.FLITT) {
+      // For Flitt, create payment order
+      try {
+        const flittService = new FlittPaymentService();
+        const baseUrl = process.env.BASE_URL || 'https://homevend.ge';
+        
+        const orderResult = await flittService.createOrder({
+          orderId: orderId,
+          amount: topUpAmount,
+          description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
+          callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
+          responseUrl: `${baseUrl}/dashboard/balance?payment=success`
+        });
+
+        if (orderResult.response_status === 'success') {
+          // Update transaction with Flitt payment ID
+          transaction.metadata = {
+            ...transaction.metadata,
+            flittPaymentId: orderResult.payment_id,
+            flittToken: orderResult.token
+          };
+          await transactionRepository.save(transaction);
+
+          res.status(200).json({
+            success: true,
+            provider: 'flitt',
+            message: 'Payment order created successfully',
+            data: {
+              transactionId: transaction.uuid,
+              checkoutUrl: orderResult.checkout_url,
+              paymentId: orderResult.payment_id,
+              amount: topUpAmount
+            }
+          });
+        } else {
+          // Mark transaction as failed
+          transaction.status = TransactionStatusEnum.FAILED;
+          transaction.metadata = {
+            ...transaction.metadata,
+            flittError: orderResult.error_message,
+            flittErrorCode: orderResult.error_code
+          };
+          await transactionRepository.save(transaction);
+
+          res.status(400).json({
+            success: false,
+            message: `Payment order creation failed: ${orderResult.error_message}`,
+            error_code: orderResult.error_code
+          });
+        }
+      } catch (error: any) {
+        console.error('Flitt service error:', error);
+        
+        // Mark transaction as failed
+        transaction.status = TransactionStatusEnum.FAILED;
+        transaction.metadata = {
+          ...transaction.metadata,
+          error: error.message
+        };
+        await transactionRepository.save(transaction);
+
+        res.status(500).json({
+          success: false,
+          message: 'Failed to create payment order'
+        });
       }
-    });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Unsupported payment provider'
+      });
+    }
   } catch (error) {
-    console.error('Process top-up error:', error);
-    await queryRunner.rollbackTransaction();
+    console.error('Initiate top-up error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to process top-up'
+      message: 'Failed to initiate top-up'
     });
-  } finally {
-    await queryRunner.release();
   }
+};
+
+// Legacy endpoint for backward compatibility
+export const processTopUp = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  // Redirect to new initiate endpoint with test provider
+  req.body.provider = PaymentProviderEnum.TEST;
+  return initiateTopUp(req, res);
 };
 
 // Get transaction history with pagination

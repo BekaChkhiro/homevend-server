@@ -4,19 +4,31 @@ import {
   processTopUp,
   getTransactionHistory,
   getDetailedTransactions,
-  getTransactionSummary as getTransactionStats
+  getTransactionSummary as getTransactionStats,
+  getPaymentProviders,
+  initiateTopUp
 } from '../controllers/balanceController.js';
+import { handleFlittCallback } from '../controllers/flittWebhookController.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
-// All balance routes require authentication
+// Webhook endpoints (no authentication required)
+router.post('/flitt/callback', handleFlittCallback);
+
+// All other balance routes require authentication
 router.use(authenticate);
 
 // Get user balance and recent transactions
 router.get('/', getUserBalance);
 
-// Process top-up
+// Get available payment providers
+router.get('/providers', getPaymentProviders);
+
+// Initiate top-up process (creates payment order)
+router.post('/initiate', initiateTopUp);
+
+// Legacy top-up endpoint (for backward compatibility)
 router.post('/top-up', processTopUp);
 
 // Get transaction history with pagination
