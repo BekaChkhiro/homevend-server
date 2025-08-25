@@ -8,7 +8,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
-import path from 'path';
 import { connectDB, AppDataSource } from './config/database.js';
 import routes from './routes/index.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
@@ -65,16 +64,6 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api', routes);
-
-// Serve static files from client build directory in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static('client/build'));
-  
-  // Catch all handler for client-side routing
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', '..', 'client', 'build', 'index.html'));
-  });
-}
 
 // Error handling middleware
 app.use(notFound);
