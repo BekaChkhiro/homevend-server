@@ -35,7 +35,8 @@ export enum DealTypeEnum {
   RENT = 'rent',
   MORTGAGE = 'mortgage',
   LEASE = 'lease',
-  DAILY = 'daily'
+  DAILY = 'daily',
+  REDEMPTION = 'redemption'
 }
 
 export enum BuildingStatusEnum {

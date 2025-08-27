@@ -8,13 +8,17 @@ export class AddFreeToServiceEnums1756010000000 implements MigrationInterface {
     await queryRunner.query(`
       DO $$
       BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_type t
-          JOIN pg_enum e ON t.oid = e.enumtypid
-          WHERE t.typname = 'service_pricing_service_type_enum'
-            AND e.enumlabel = 'free'
+        IF EXISTS (
+          SELECT 1 FROM pg_type WHERE typname = 'service_pricing_service_type_enum'
         ) THEN
-          ALTER TYPE service_pricing_service_type_enum ADD VALUE 'free';
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_type t
+            JOIN pg_enum e ON t.oid = e.enumtypid
+            WHERE t.typname = 'service_pricing_service_type_enum'
+              AND e.enumlabel = 'free'
+          ) THEN
+            ALTER TYPE service_pricing_service_type_enum ADD VALUE 'free';
+          END IF;
         END IF;
       END$$ LANGUAGE plpgsql;
     `);
