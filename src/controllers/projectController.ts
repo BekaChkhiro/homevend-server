@@ -100,6 +100,8 @@ export const getProjectById = async (req: Request, res: Response): Promise<void>
       .leftJoinAndSelect('project.areaData', 'areaData')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .leftJoinAndSelect('project.amenities', 'amenities')
+      .leftJoin('project.developer', 'developer')
+      .addSelect(['developer.id', 'developer.fullName', 'developer.email', 'developer.phone'])
       .where('project.id = :id', { id })
       .andWhere('project.isActive = :isActive', { isActive: true })
       .getOne();
