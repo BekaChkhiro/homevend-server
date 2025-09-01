@@ -30,11 +30,16 @@ app.use(cors({
     process.env.CLIENT_URL || 'http://localhost:8082',
     'http://localhost:8080',
     'http://localhost:8081',
-    'http://192.168.68.69:8082'
+    'http://192.168.68.69:8082',
+    'https://homevend.ge',
+    'https://www.homevend.ge',
+    'http://localhost:3000'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 // Body parsing and compression
