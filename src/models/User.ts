@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   BeforeInsert,
+  BeforeUpdate,
   ManyToOne,
   JoinColumn,
   Index
@@ -81,6 +82,23 @@ export class User {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0.00 })
   balance!: number;
 
+  // Email verification fields
+  @Column({ name: 'email_verified', type: 'boolean', default: false })
+  emailVerified!: boolean;
+
+  @Column({ name: 'verification_token', type: 'varchar', length: 255, nullable: true })
+  verificationToken?: string | null;
+
+  @Column({ name: 'verification_token_expires', type: 'timestamp with time zone', nullable: true })
+  verificationTokenExpires?: Date | null;
+
+  // Password reset fields
+  @Column({ name: 'reset_password_token', type: 'varchar', length: 255, nullable: true })
+  resetPasswordToken?: string | null;
+
+  @Column({ name: 'reset_password_expires', type: 'timestamp with time zone', nullable: true })
+  resetPasswordExpires?: Date | null;
+
   // Agency relationship for agents
   @Column({ name: 'agency_id', type: 'integer', nullable: true })
   agencyId?: number;
@@ -95,12 +113,22 @@ export class User {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp with time zone' })
   updatedAt!: Date;
 
-  @BeforeInsert()
-  async hashPassword(): Promise<void> {
-    if (this.password) {
+  private async hashPasswordIfNeeded(): Promise<void> {
+    // Only hash if password is not already hashed (bcrypt hashes start with $2)
+    if (this.password && !this.password.startsWith('$2')) {
       const saltRounds = 12;
       this.password = await bcrypt.hash(this.password, saltRounds);
     }
+  }
+
+  @BeforeInsert()
+  async hashPasswordOnInsert(): Promise<void> {
+    await this.hashPasswordIfNeeded();
+  }
+
+  @BeforeUpdate()
+  async hashPasswordOnUpdate(): Promise<void> {
+    await this.hashPasswordIfNeeded();
   }
 
   async comparePassword(candidatePassword: string): Promise<boolean> {

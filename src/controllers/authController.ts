@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import { AppDataSource } from '../config/database.js';
 import { User, UserRoleEnum } from '../models/User.js';
 import { Agency } from '../models/Agency.js';
@@ -6,9 +7,11 @@ import { generateToken } from '../utils/jwt.js';
 import { generateTokenPair, verifyRefreshToken, generateAccessToken, revokeRefreshToken } from '../utils/refreshToken.js';
 import { LoginResponse } from '../types/auth.js';
 import { AuthenticatedRequest } from '../types/auth.js';
+import emailService from '../services/emailService.js';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('🔄 Registration request received for email:', req.body.email);
     const { fullName, email, password, role = UserRoleEnum.USER, agencyData, developerData } = req.body;
 
     const userRepository = AppDataSource.getRepository(User);
@@ -46,6 +49,12 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       user.password = password;
       user.role = role;
       
+      // Generate email verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      user.verificationToken = verificationToken;
+      user.verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      user.emailVerified = false;
+      
       // Add phone number if provided
       if (role === UserRoleEnum.AGENCY && agencyData?.phone) {
         user.phone = agencyData.phone;
@@ -72,6 +81,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return { savedUser, savedAgency };
     });
 
+    console.log('✅ User saved to database with verification token:', result.savedUser.verificationToken);
+
     // Generate tokens
     const { accessToken, refreshToken } = generateTokenPair({
       userId: result.savedUser.id,
@@ -92,11 +103,29 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       refreshToken
     };
 
+    // Send verification email
+    try {
+      console.log('🔄 Attempting to send verification email to:', result.savedUser.email);
+      console.log('🔑 Verification token:', result.savedUser.verificationToken);
+      
+      await emailService.sendVerificationEmail(
+        result.savedUser.email,
+        result.savedUser.verificationToken!,
+        result.savedUser.fullName
+      );
+      
+      console.log('✅ Verification email sent successfully');
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
+      console.error('Email error details:', emailError);
+      // Continue with registration even if email fails
+    }
+
     const message = role === UserRoleEnum.AGENCY 
-      ? 'Agency registered successfully'
+      ? 'Agency registered successfully. Please check your email to verify your account.'
       : role === UserRoleEnum.DEVELOPER
-      ? 'Developer registered successfully'
-      : 'User registered successfully';
+      ? 'Developer registered successfully. Please check your email to verify your account.'
+      : 'User registered successfully. Please check your email to verify your account.';
 
     res.status(201).json({
       success: true,
@@ -266,3 +295,265 @@ export const logout = async (req: AuthenticatedRequest, res: Response): Promise<
     });
   }
 };
+
+// Email verification functions
+export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+    
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: {
+        verificationToken: token
+      }
+    });
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification token'
+      });
+      return;
+    }
+
+    // Check if token is expired
+    if (user.verificationTokenExpires && user.verificationTokenExpires < new Date()) {
+      res.status(400).json({
+        success: false,
+        message: 'Verification token has expired'
+      });
+      return;
+    }
+
+    // Mark email as verified
+    user.emailVerified = true;
+    user.verificationToken = null;
+    user.verificationTokenExpires = null;
+    await userRepository.save(user);
+
+    // Send welcome email
+    try {
+      await emailService.sendWelcomeEmail(user.email, user.fullName);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully'
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify email'
+    });
+  }
+};
+
+export const resendVerification = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      res.status(200).json({
+        success: true,
+        message: 'If an account exists with this email, a verification link has been sent'
+      });
+      return;
+    }
+
+    if (user.emailVerified) {
+      res.status(400).json({
+        success: false,
+        message: 'Email is already verified'
+      });
+      return;
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    user.verificationToken = verificationToken;
+    user.verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await userRepository.save(user);
+
+    // Send verification email
+    try {
+      await emailService.sendVerificationEmail(user.email, verificationToken, user.fullName);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send verification email'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification email sent successfully'
+    });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend verification email'
+    });
+  }
+};
+
+// Password reset functions
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  console.log('=== FORGOT PASSWORD CONTROLLER HIT ===');
+  console.log('Request body:', req.body);
+  try {
+    console.log('🔄 Forgot password request for email:', req.body.email);
+    const { email } = req.body;
+    
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({ where: { email } });
+    
+    console.log('🔍 User found:', user ? 'Yes' : 'No');
+
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      res.status(200).json({
+        success: true,
+        message: 'If an account exists with this email, a password reset link has been sent'
+      });
+      return;
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await userRepository.save(user);
+    
+    console.log('🔑 Reset token generated:', resetToken);
+
+    // Send reset email
+    try {
+      console.log('📧 Attempting to send password reset email...');
+      await emailService.sendPasswordResetEmail(user.email, resetToken, user.fullName);
+      console.log('✅ Password reset email sent successfully');
+    } catch (emailError) {
+      console.error('❌ Failed to send password reset email:', emailError);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset email'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset email sent successfully'
+    });
+  } catch (error) {
+    console.error('=== FORGOT PASSWORD ERROR ===');
+    console.error('Forgot password error:', error);
+    console.error('Error stack:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request'
+    });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+    
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: {
+        resetPasswordToken: token
+      }
+    });
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+      return;
+    }
+
+    // Check if token is expired
+    if (user.resetPasswordExpires && user.resetPasswordExpires < new Date()) {
+      res.status(400).json({
+        success: false,
+        message: 'Password reset token has expired'
+      });
+      return;
+    }
+
+    // Update password
+    user.password = password; // Will be hashed by @BeforeInsert/@BeforeUpdate hook
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await userRepository.save(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password'
+    });
+  }
+};
+
+export const validateResetToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+    
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: {
+        resetPasswordToken: token
+      }
+    });
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid reset token'
+      });
+      return;
+    }
+
+    // Check if token is expired
+    if (user.resetPasswordExpires && user.resetPasswordExpires < new Date()) {
+      res.status(400).json({
+        success: false,
+        message: 'Password reset token has expired'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Token is valid',
+      data: {
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Validate reset token error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to validate reset token'
+    });
+  }
+};
+
