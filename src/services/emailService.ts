@@ -105,36 +105,154 @@ class EmailService {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #4F46E5; color: white; padding: 20px; text-align: center; }
-          .content { background-color: #f4f4f4; padding: 30px; border-radius: 0 0 5px 5px; }
-          .button { display: inline-block; padding: 12px 30px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
+            line-height: 1.6; 
+            color: #1f2937; 
+            background-color: #f8fafc;
+          }
+          .email-wrapper { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          }
+          .header { 
+            background-color: #1f2937; 
+            color: white; 
+            padding: 32px 24px; 
+            text-align: center; 
+            border-radius: 8px 8px 0 0;
+          }
+          .logo { 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 8px; 
+            margin-bottom: 8px;
+          }
+          .logo-icon { 
+            background-color: white; 
+            border-radius: 6px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            padding: 6px;
+            font-size: 20px;
+          }
+          .brand-name { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: white;
+          }
+          .content { 
+            padding: 40px 32px; 
+            background-color: white;
+          }
+          .welcome-text { 
+            font-size: 28px; 
+            font-weight: bold; 
+            color: #1f2937; 
+            margin-bottom: 16px;
+          }
+          .description { 
+            font-size: 16px; 
+            color: #6b7280; 
+            margin-bottom: 32px;
+          }
+          .cta-button { 
+            display: inline-block; 
+            background-color: #1f2937; 
+            color: white; 
+            padding: 16px 32px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            font-size: 16px;
+            margin: 24px 0;
+            transition: background-color 0.2s;
+          }
+          .cta-button:hover { 
+            background-color: #374151; 
+          }
+          .alternative-link { 
+            background-color: #f9fafb; 
+            border: 1px solid #e5e7eb; 
+            border-radius: 8px; 
+            padding: 16px; 
+            margin: 24px 0; 
+            word-break: break-all; 
+            font-family: monospace; 
+            font-size: 14px;
+            color: #1f2937;
+          }
+          .info-box { 
+            background-color: #fef3c7; 
+            border-left: 4px solid #f59e0b; 
+            padding: 16px; 
+            margin: 24px 0; 
+            border-radius: 4px;
+          }
+          .footer { 
+            background-color: #f9fafb; 
+            text-align: center; 
+            padding: 32px; 
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280; 
+            font-size: 14px;
+          }
+          .footer-links { 
+            margin-top: 16px;
+          }
+          .footer-link { 
+            color: #1f2937; 
+            text-decoration: none; 
+            margin: 0 12px;
+          }
+          .footer-link:hover { 
+            text-decoration: underline;
+          }
         </style>
       </head>
       <body>
-        <div class="container">
+        <div class="email-wrapper">
           <div class="header">
-            <h1>${this.APP_NAME}</h1>
+            <div class="logo">
+              <div class="logo-icon">🏠</div>
+              <span class="brand-name">HOMEVEND.ge</span>
+            </div>
           </div>
+          
           <div class="content">
-            <h2>გამარჯობა ${userName}!</h2>
-            <p>გმადლობთ HomevEnd-ზე რეგისტრაციისთვის!</p>
-            <p>თქვენი ანგარიშის გასააქტიურებლად, გთხოვთ დაადასტუროთ თქვენი ელ.ფოსტის მისამართი:</p>
+            <h1 class="welcome-text">გამარჯობა ${userName}!</h1>
+            <p class="description">გმადლობთ HOMEVEND.ge-ზე რეგისტრაციისთვის! თქვენი ანგარიშის გასააქტიურებლად, გთხოვთ დაადასტუროთ თქვენი ელ.ფოსტის მისამართი.</p>
+            
             <center>
-              <a href="${verificationUrl}" class="button">ელ.ფოსტის დადასტურება</a>
+              <a href="${verificationUrl}" class="cta-button" style="color: white !important;">ელ.ფოსტის დადასტურება</a>
             </center>
-            <p>ან დააკოპირეთ და ჩასვით ეს ბმული თქვენს ბრაუზერში:</p>
-            <p style="word-break: break-all; background: #fff; padding: 10px; border-radius: 3px;">
-              ${verificationUrl}
+            
+            <p style="margin-top: 24px; color: #6b7280;">ან დააკოპირეთ და ჩასვით ეს ბმული თქვენს ბრაუზერში:</p>
+            <div class="alternative-link">${verificationUrl}</div>
+            
+            <div class="info-box">
+              <strong>ყურადღება:</strong> ეს ბმული აქტიურია 24 საათის განმავლობაში უსაფრთხოების მიზნებისთვის.
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">
+              თუ თქვენ არ დარეგისტრირებულხართ HOMEVEND.ge-ზე, შეგიძლიათ უგულებელყოთ ეს შეტყობინება.
             </p>
-            <p>ეს ბმული აქტიურია 24 საათის განმავლობაში.</p>
-            <p>თუ თქვენ არ დარეგისტრირებულხართ HomevEnd-ზე, გთხოვთ უგულებელყოთ ეს შეტყობინება.</p>
           </div>
+          
           <div class="footer">
-            <p>© ${new Date().getFullYear()} ${this.APP_NAME}. ყველა უფლება დაცულია.</p>
+            <p>© ${new Date().getFullYear()} HOMEVEND.ge - საქართველოს #1 უძრავი ქონების პლატფორმა</p>
+            <div class="footer-links">
+              <a href="${this.CLIENT_URL}" class="footer-link">მთავარი</a>
+              <a href="${this.CLIENT_URL}/about" class="footer-link">ჩვენ შესახებ</a>
+              <a href="${this.CLIENT_URL}/contact" class="footer-link">კონტაქტი</a>
+            </div>
           </div>
         </div>
       </body>
@@ -158,40 +276,164 @@ class EmailService {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #DC2626; color: white; padding: 20px; text-align: center; }
-          .content { background-color: #f4f4f4; padding: 30px; border-radius: 0 0 5px 5px; }
-          .button { display: inline-block; padding: 12px 30px; background-color: #DC2626; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-          .warning { background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 10px; margin: 20px 0; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
+            line-height: 1.6; 
+            color: #1f2937; 
+            background-color: #f8fafc;
+          }
+          .email-wrapper { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          }
+          .header { 
+            background-color: #1f2937; 
+            color: white; 
+            padding: 32px 24px; 
+            text-align: center; 
+            border-radius: 8px 8px 0 0;
+          }
+          .logo { 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 8px; 
+            margin-bottom: 8px;
+          }
+          .logo-icon { 
+            background-color: white; 
+            border-radius: 6px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            padding: 6px;
+            font-size: 20px;
+          }
+          .brand-name { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: white;
+          }
+          .content { 
+            padding: 40px 32px; 
+            background-color: white;
+          }
+          .title-text { 
+            font-size: 28px; 
+            font-weight: bold; 
+            font-color:rgb(255, 255, 255);
+            text-decoration: none;
+            margin-bottom: 16px;
+          }
+          .description { 
+            font-size: 16px; 
+            color: #6b7280; 
+            margin-bottom: 32px;
+          }
+          .cta-button { 
+            display: inline-block; 
+            background-color: #1f2937; 
+            color: white; 
+            padding: 16px 32px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            font-size: 16px;
+            margin: 24px 0;
+            transition: background-color 0.2s;
+          }
+          .cta-button:hover { 
+            background-color:rgb(41, 49, 61); 
+          }
+          .alternative-link { 
+            background-color: #f9fafb; 
+            border: 1px solid #e5e7eb; 
+            border-radius: 8px; 
+            padding: 16px; 
+            margin: 24px 0; 
+            word-break: break-all; 
+            font-family: monospace; 
+            font-size: 14px;
+            color: #1f2937;
+          }
+          .warning-box { 
+            background-color: #fef3c7; 
+            border-left: 4px solid #f59e0b; 
+            padding: 16px; 
+            margin: 24px 0; 
+            border-radius: 4px;
+          }
+          .security-info { 
+            background-color: #fef2f2; 
+            border-left: 4px solid #ef4444; 
+            padding: 16px; 
+            margin: 24px 0; 
+            border-radius: 4px;
+          }
+          .footer { 
+            background-color: #f9fafb; 
+            text-align: center; 
+            padding: 32px; 
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280; 
+            font-size: 14px;
+          }
+          .footer-links { 
+            margin-top: 16px;
+          }
+          .footer-link { 
+            color: #1f2937; 
+            text-decoration: none; 
+            margin: 0 12px;
+          }
+          .footer-link:hover { 
+            text-decoration: underline;
+          }
         </style>
       </head>
       <body>
-        <div class="container">
+        <div class="email-wrapper">
           <div class="header">
-            <h1>${this.APP_NAME}</h1>
-          </div>
-          <div class="content">
-            <h2>პაროლის აღდგენა</h2>
-            <p>გამარჯობა ${userName},</p>
-            <p>მივიღეთ თქვენი მოთხოვნა პაროლის აღდგენაზე.</p>
-            <p>ახალი პაროლის დასაყენებლად დააჭირეთ ქვემოთ მოცემულ ღილაკს:</p>
-            <center>
-              <a href="${resetUrl}" class="button">პაროლის აღდგენა</a>
-            </center>
-            <p>ან დააკოპირეთ და ჩასვით ეს ბმული თქვენს ბრაუზერში:</p>
-            <p style="word-break: break-all; background: #fff; padding: 10px; border-radius: 3px;">
-              ${resetUrl}
-            </p>
-            <div class="warning">
-              <strong>ყურადღება:</strong> ეს ბმული აქტიურია მხოლოდ 1 საათის განმავლობაში უსაფრთხოების მიზნებისთვის.
+            <div class="logo">
+              <div class="logo-icon">🏠</div>
+              <span class="brand-name">HOMEVEND.ge</span>
             </div>
-            <p>თუ თქვენ არ მოითხოვეთ პაროლის აღდგენა, შეგიძლიათ უგულებელყოთ ეს შეტყობინება. თქვენი პაროლი არ შეიცვლება.</p>
           </div>
+          
+          <div class="content">
+            <h1 class="title-text">🔐 პაროლის აღდგენა</h1>
+            <p class="description">გამარჯობა ${userName}, მივიღეთ თქვენი მოთხოვნა პაროლის აღდგენაზე.</p>
+            
+            <p style="margin-bottom: 24px; color: #374151;">ახალი პაროლის დასაყენებლად დააჭირეთ ქვემოთ მოცემულ ღილაკს:</p>
+            
+            <center>
+              <a href="${resetUrl}" class="cta-button" style="color: white !important;">პაროლის აღდგენა</a>
+            </center>
+            
+            <p style="margin-top: 24px; color: #6b7280;">ან დააკოპირეთ და ჩასვით ეს ბმული თქვენს ბრაუზერში:</p>
+            <div class="alternative-link">${resetUrl}</div>
+            
+            <div class="warning-box">
+              <strong>⏰ ყურადღება:</strong> ეს ბმული აქტიურია მხოლოდ 1 საათის განმავლობაში უსაფრთხოების მიზნებისთვის.
+            </div>
+            
+            <div class="security-info">
+              <strong>🔒 უსაფრთხოება:</strong> თუ თქვენ არ მოითხოვეთ პაროლის აღდგენა, შეგიძლიათ უგულებელყოთ ეს შეტყობინება. თქვენი პაროლი არ შეიცვლება.
+            </div>
+          </div>
+          
           <div class="footer">
-            <p>© ${new Date().getFullYear()} ${this.APP_NAME}. ყველა უფლება დაცულია.</p>
+            <p>© ${new Date().getFullYear()} HOMEVEND.ge - საქართველოს #1 უძრავი ქონების პლატფორმა</p>
+            <div class="footer-links">
+              <a href="${this.CLIENT_URL}" class="footer-link">მთავარი</a>
+              <a href="${this.CLIENT_URL}/about" class="footer-link">ჩვენ შესახებ</a>
+              <a href="${this.CLIENT_URL}/contact" class="footer-link">კონტაქტი</a>
+            </div>
           </div>
         </div>
       </body>
@@ -208,55 +450,6 @@ class EmailService {
     console.log('📧 sendEmail completed');
   }
 
-  async sendWelcomeEmail(email: string, userName: string): Promise<void> {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #10B981; color: white; padding: 20px; text-align: center; }
-          .content { background-color: #f4f4f4; padding: 30px; border-radius: 0 0 5px 5px; }
-          .button { display: inline-block; padding: 12px 30px; background-color: #10B981; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>კეთილი იყოს თქვენი მობრძანება ${this.APP_NAME}-ზე!</h1>
-          </div>
-          <div class="content">
-            <h2>გამარჯობა ${userName}!</h2>
-            <p>თქვენი ანგარიში წარმატებით გააქტიურდა!</p>
-            <p>ახლა შეგიძლიათ სრულად გამოიყენოთ ჩვენი პლატფორმის ყველა ფუნქცია:</p>
-            <ul>
-              <li>განცხადებების დამატება და მართვა</li>
-              <li>ფავორიტების შენახვა</li>
-              <li>პროფილის პერსონალიზაცია</li>
-              <li>VIP სერვისების გამოყენება</li>
-            </ul>
-            <center>
-              <a href="${this.CLIENT_URL}/dashboard" class="button">ჩემი ანგარიში</a>
-            </center>
-            <p>კითხვების შემთხვევაში, მოგვწერეთ: support@homevend.ge</p>
-          </div>
-          <div class="footer">
-            <p>© ${new Date().getFullYear()} ${this.APP_NAME}. ყველა უფლება დაცულია.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    await this.sendEmail({
-      to: email,
-      subject: `კეთილი იყოს თქვენი მობრძანება ${this.APP_NAME}-ზე!`,
-      html,
-      text: `გამარჯობა ${userName}! თქვენი ანგარიში წარმატებით გააქტიურდა. ეწვიეთ ${this.CLIENT_URL}/dashboard`,
-    });
-  }
 }
 
 export default new EmailService();
