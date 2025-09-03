@@ -331,13 +331,6 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
     user.verificationTokenExpires = null;
     await userRepository.save(user);
 
-    // Send welcome email
-    try {
-      await emailService.sendWelcomeEmail(user.email, user.fullName);
-    } catch (emailError) {
-      console.error('Failed to send welcome email:', emailError);
-    }
-
     res.status(200).json({
       success: true,
       message: 'Email verified successfully'
