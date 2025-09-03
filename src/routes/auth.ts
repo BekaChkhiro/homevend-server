@@ -18,9 +18,9 @@ import { authRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
-// Public routes (rate limiting removed for easier testing)
-router.post('/register', validate(registerSchema), register);
-router.post('/login', validate(loginSchema), login);
+// Public routes with rate limiting
+router.post('/register', authRateLimiter, validate(registerSchema), register);
+router.post('/login', authRateLimiter, validate(loginSchema), login);
 router.post('/refresh', refreshToken);
 
 // Email verification routes
