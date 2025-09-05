@@ -9,12 +9,14 @@ import {
   initiateTopUp
 } from '../controllers/balanceController.js';
 import { handleFlittCallback } from '../controllers/flittWebhookController.js';
+import { handleBogCallback } from '../controllers/bogWebhookController.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
 // Webhook endpoints (no authentication required)
 router.post('/flitt/callback', handleFlittCallback);
+router.post('/bog/callback', handleBogCallback);
 
 // All other balance routes require authentication
 router.use(authenticate);

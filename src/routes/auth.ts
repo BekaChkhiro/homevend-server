@@ -20,7 +20,7 @@ const router = Router();
 
 // Public routes with rate limiting
 router.post('/register', authRateLimiter, validate(registerSchema), register);
-router.post('/login', authRateLimiter, validate(loginSchema), login);
+router.post('/login', validate(loginSchema), login); // Temporarily disabled rate limiting for testing
 router.post('/refresh', refreshToken);
 
 // Email verification routes

@@ -1,6 +1,7 @@
 export enum PaymentProviderEnum {
   TEST = 'test',
-  FLITT = 'flitt'
+  FLITT = 'flitt',
+  BOG = 'bog'
 }
 
 export interface PaymentProvider {
@@ -29,11 +30,21 @@ export const PAYMENT_PROVIDERS: PaymentProvider[] = [
     id: PaymentProviderEnum.FLITT,
     name: 'flitt',
     displayName: 'ბანკის ბარათი (Flitt)',
-    isEnabled: true,
+    isEnabled: !!(process.env.FLITT_MERCHANT_ID && process.env.FLITT_SECRET_KEY),
     minAmount: 1,
     maxAmount: 10000,
     currency: 'GEL',
     description: 'ონლაინ გადახდა ვიზა/მასტერკარდით'
+  },
+  {
+    id: PaymentProviderEnum.BOG,
+    name: 'bog',
+    displayName: 'საქართველოს ბანკი (BOG)',
+    isEnabled: !!(process.env.BOG_CLIENT_ID && (process.env.BOG_SECRET_KEY || process.env.BOG_CLIENT_SECRET)),
+    minAmount: 1,
+    maxAmount: 50000,
+    currency: 'GEL',
+    description: 'ონლაინ გადახდა ბარათით, Apple Pay, Google Pay, განვადება'
   }
 ];
 

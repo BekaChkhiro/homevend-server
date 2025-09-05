@@ -5,6 +5,7 @@ import { Transaction, TransactionTypeEnum, TransactionStatusEnum } from '../mode
 import { AuthenticatedRequest } from '../types/auth.js';
 import { getDetailedTransactionHistory, getTransactionSummary as getTransactionSummaryUtil, TransactionFilter } from '../utils/transactionQueries.js';
 import { FlittPaymentService } from '../services/payments/FlittPaymentService.js';
+import { BogPaymentService } from '../services/payments/BogPaymentService.js';
 import { PaymentProviderEnum, getEnabledPaymentProviders, getPaymentProvider } from '../services/payments/PaymentProviders.js';
 
 // Get user balance and recent transactions
@@ -203,9 +204,18 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
     } else if (provider === PaymentProviderEnum.FLITT) {
       // For Flitt, create payment order
       try {
+        console.log('🔄 Creating Flitt payment service...');
         const flittService = new FlittPaymentService();
         const baseUrl = process.env.BASE_URL || 'https://homevend.ge';
         
+        console.log('🔄 Creating Flitt order with params:', {
+          orderId: orderId,
+          amount: topUpAmount,
+          description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
+          callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
+          responseUrl: `${baseUrl}/dashboard/balance?payment=success`
+        });
+
         const orderResult = await flittService.createOrder({
           orderId: orderId,
           amount: topUpAmount,
@@ -213,6 +223,8 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
           responseUrl: `${baseUrl}/dashboard/balance?payment=success`
         });
+
+        console.log('🔄 Flitt order result:', orderResult);
 
         if (orderResult.response_status === 'success') {
           // Update transaction with Flitt payment ID
@@ -244,10 +256,14 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           };
           await transactionRepository.save(transaction);
 
+          const errorMessage = orderResult.error_message || 'Unknown error occurred';
+          const errorCode = orderResult.error_code || 'UNKNOWN_ERROR';
+          
           res.status(400).json({
             success: false,
-            message: `Payment order creation failed: ${orderResult.error_message}`,
-            error_code: orderResult.error_code
+            message: `Payment order creation failed: ${errorMessage}`,
+            error_code: errorCode,
+            debug_info: orderResult
           });
         }
       } catch (error: any) {
@@ -264,6 +280,72 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
         res.status(500).json({
           success: false,
           message: 'Failed to create payment order'
+        });
+      }
+    } else if (provider === PaymentProviderEnum.BOG) {
+      // For BOG, create payment order
+      try {
+        const bogService = new BogPaymentService();
+        const baseUrl = process.env.BASE_URL || 'https://homevend.ge';
+        
+        const orderResult = await bogService.createOrder({
+          orderId: orderId,
+          amount: topUpAmount,
+          currency: 'GEL',
+          description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
+          callbackUrl: `${baseUrl}/api/balance/bog/callback`,
+          successUrl: `${baseUrl}/dashboard/balance?payment=success`,
+          failUrl: `${baseUrl}/dashboard/balance?payment=failed`,
+          paymentMethods: ['card'],  // Only card payments for now
+          ttl: 15,
+          buyer: {
+            fullName: user.fullName,
+            email: user.email,
+            phone: undefined // Add phone if available in user model
+          },
+          capture: 'automatic'
+        });
+
+        // Update transaction with BOG order ID
+        const bogOrderId = orderResult.id || orderResult.order_id;
+        const redirectUrl = typeof orderResult._links.redirect === 'string' 
+          ? orderResult._links.redirect 
+          : orderResult._links.redirect.href;
+        
+        transaction.metadata = {
+          ...transaction.metadata,
+          bogOrderId: bogOrderId,
+          bogRedirectUrl: redirectUrl
+        };
+        await transactionRepository.save(transaction);
+
+        res.status(200).json({
+          success: true,
+          provider: 'bog',
+          message: 'BOG payment order created successfully',
+          data: {
+            transactionId: transaction.uuid,
+            checkoutUrl: redirectUrl,
+            orderId: bogOrderId,
+            amount: topUpAmount
+          }
+        });
+
+      } catch (error: any) {
+        console.error('BOG service error:', error);
+        
+        // Mark transaction as failed
+        transaction.status = TransactionStatusEnum.FAILED;
+        transaction.metadata = {
+          ...transaction.metadata,
+          error: error.message,
+          bogError: true
+        };
+        await transactionRepository.save(transaction);
+
+        res.status(500).json({
+          success: false,
+          message: `Failed to create BOG payment order: ${error.message}`
         });
       }
     } else {
