@@ -100,9 +100,9 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
           ...updatedMetadata,
           completedAt: new Date().toISOString(),
           bogPaymentStatus: 'completed',
-          transferAmount: callbackData.body.purchase_units.transfer_amount,
+          transferAmount: callbackData.body.purchase_units?.transfer_amount || transaction.amount.toString(),
           bogTransactionId: callbackData.body.payment_detail?.transaction_id,
-          paymentMethod: callbackData.body.payment_detail?.transfer_method.key,
+          paymentMethod: callbackData.body.payment_detail?.transfer_method?.key,
           cardType: callbackData.body.payment_detail?.card_type,
           payerIdentifier: callbackData.body.payment_detail?.payer_identifier
         };
@@ -155,7 +155,7 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
             select: ['id', 'balance']
           });
 
-          if (user) {
+          if (user && callbackData.body.purchase_units?.refund_amount) {
             const refundAmount = parseFloat(callbackData.body.purchase_units.refund_amount);
             const currentBalance = parseFloat(user.balance.toString());
             user.balance = currentBalance - refundAmount;
@@ -169,7 +169,7 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
           ...updatedMetadata,
           bogPaymentStatus: orderStatus,
           refundedAt: new Date().toISOString(),
-          refundAmount: callbackData.body.purchase_units.refund_amount,
+          refundAmount: callbackData.body.purchase_units?.refund_amount || 0,
           wasCompleted: wasCompleted
         };
         

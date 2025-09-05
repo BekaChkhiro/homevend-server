@@ -306,6 +306,8 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           capture: 'automatic'
         });
 
+        console.log('✅ BOG Order Creation Response:', JSON.stringify(orderResult, null, 2));
+
         // Update transaction with BOG order ID
         const bogOrderId = orderResult.id || orderResult.order_id;
         const redirectUrl = typeof orderResult._links.redirect === 'string' 
@@ -318,6 +320,14 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           bogRedirectUrl: redirectUrl
         };
         await transactionRepository.save(transaction);
+
+        console.log('💰 Sending BOG Response to Frontend:', {
+          success: true,
+          provider: 'bog',
+          checkoutUrl: redirectUrl,
+          orderId: bogOrderId,
+          amount: topUpAmount
+        });
 
         res.status(200).json({
           success: true,

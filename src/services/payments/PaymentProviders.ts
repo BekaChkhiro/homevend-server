@@ -31,7 +31,7 @@ export const PAYMENT_PROVIDERS: PaymentProvider[] = [
     name: 'flitt',
     displayName: 'ბანკის ბარათი (Flitt)',
     isEnabled: !!(process.env.FLITT_MERCHANT_ID && process.env.FLITT_SECRET_KEY),
-    minAmount: 1,
+    minAmount: 0.01,
     maxAmount: 10000,
     currency: 'GEL',
     description: 'ონლაინ გადახდა ვიზა/მასტერკარდით'
@@ -41,7 +41,7 @@ export const PAYMENT_PROVIDERS: PaymentProvider[] = [
     name: 'bog',
     displayName: 'საქართველოს ბანკი (BOG)',
     isEnabled: !!(process.env.BOG_CLIENT_ID && (process.env.BOG_SECRET_KEY || process.env.BOG_CLIENT_SECRET)),
-    minAmount: 1,
+    minAmount: 0.01,
     maxAmount: 50000,
     currency: 'GEL',
     description: 'ონლაინ გადახდა ბარათით, Apple Pay, Google Pay, განვადება'
