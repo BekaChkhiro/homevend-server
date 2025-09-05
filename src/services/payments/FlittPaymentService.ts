@@ -12,12 +12,13 @@ export interface FlittOrderRequest {
 }
 
 export interface FlittOrderResponse {
-  response_status: 'success' | 'failure';
+  response_status?: 'success' | 'failure';
   checkout_url?: string;
   token?: string;
   payment_id?: string;
   error_message?: string;
-  error_code?: string;
+  error_code?: number | string;
+  status?: string;
 }
 
 export interface FlittCallbackData {
@@ -39,7 +40,13 @@ export class FlittPaymentService {
   constructor() {
     this.merchantId = process.env.FLITT_MERCHANT_ID!;
     this.secretKey = process.env.FLITT_SECRET_KEY!;
-    this.baseUrl = process.env.FLITT_BASE_URL || 'https://checkout.flitt.com';
+    this.baseUrl = process.env.FLITT_BASE_URL || 'https://pay.flitt.com';
+    
+    console.log('🔄 Initializing Flitt service with:', {
+      merchantId: this.merchantId ? 'Present' : 'Missing',
+      secretKey: this.secretKey ? 'Present' : 'Missing',
+      baseUrl: this.baseUrl
+    });
     
     if (!this.merchantId || !this.secretKey) {
       throw new Error('Flitt merchant ID and secret key are required');
@@ -91,7 +98,7 @@ export class FlittPaymentService {
     const orderData: FlittOrderRequest = {
       merchant_id: this.merchantId,
       order_id: params.orderId,
-      amount: params.amount.toFixed(2),
+      amount: Math.round(params.amount * 100).toString(), // Convert to tetri (cents)
       currency: 'GEL',
       order_desc: params.description,
       server_callback_url: params.callbackUrl,
@@ -100,12 +107,17 @@ export class FlittPaymentService {
 
     // Generate signature
     const signature = this.generateSignature(orderData);
-    const requestData = { ...orderData, signature };
+    const requestPayload = {
+      request: { ...orderData, signature }
+    };
 
     try {
+      console.log('🔄 Making Flitt API request to:', `${this.baseUrl}/api/checkout/url`);
+      console.log('🔄 Request data:', JSON.stringify(requestPayload, null, 2));
+
       const response = await axios.post(
         `${this.baseUrl}/api/checkout/url`,
-        requestData,
+        requestPayload,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -115,9 +127,30 @@ export class FlittPaymentService {
         }
       );
 
-      return response.data as FlittOrderResponse;
+      console.log('✅ Flitt API Response:', response.data);
+      
+      // For successful response, return the data directly
+      // For error response, it will be in nested format
+      if (response.data.checkout_url || response.data.token) {
+        // Success response - add success status
+        return {
+          ...response.data,
+          response_status: 'success'
+        } as FlittOrderResponse;
+      } else if (response.data.response) {
+        // Error response in nested format
+        return response.data.response as FlittOrderResponse;
+      } else {
+        // Direct response format
+        return response.data as FlittOrderResponse;
+      }
     } catch (error: any) {
-      console.error('Flitt API Error:', error.response?.data || error.message);
+      console.error('❌ Flitt API Error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
       
       return {
         response_status: 'failure',
