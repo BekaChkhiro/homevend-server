@@ -199,7 +199,7 @@ export class BogPaymentService {
     };
 
     this.baseUrl = process.env.BOG_API_URL || 'https://api.bog.ge/payments/v1';
-    this.authUrl = process.env.BOG_AUTH_URL || 'https://api.bog.ge/auth/oauth/token';
+    this.authUrl = process.env.BOG_AUTH_URL || 'https://oauth2.bog.ge/auth/realms/bog/protocol/openid-connect/token';
     
     // BOG public key for signature verification
     this.publicKey = `-----BEGIN PUBLIC KEY-----
@@ -403,7 +403,8 @@ PwIDAQAB
             'Authorization': authHeader,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Accept-Language': 'en',
+            'Accept-Language': 'ka',
+            'Theme': 'light',
             'Idempotency-Key': idempotencyKey
           },
           timeout: 30000
