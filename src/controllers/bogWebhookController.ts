@@ -372,21 +372,30 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // According to BOG documentation, callbacks are sent in this format:
-    // { "event": "order_payment", "zoned_request_time": "...", "body": { payment_details } }
+    // Based on working PHP implementation, BOG sends callbacks in this format:
+    // { "body": { "external_order_id": "...", "order_status": { "key": "completed" }, ... } }
     const callbackData: any = req.body;
     
     console.log('Analyzing callback structure...');
+    console.log('Has body field:', !!callbackData.body);
     console.log('Has event field:', !!callbackData.event);
     console.log('Event value:', callbackData.event);
-    console.log('Has body field:', !!callbackData.body);
     console.log('Has zoned_request_time:', !!callbackData.zoned_request_time);
     
-    // Check if this is the correct BOG callback format
-    const isBogCallback = callbackData.event === 'order_payment' && callbackData.body;
+    // Check for the working format from PHP implementation
+    const isWorkingFormat = callbackData.body && callbackData.body.external_order_id;
     
-    if (isBogCallback) {
-      console.log('✅ Detected correct BOG callback format');
+    if (isWorkingFormat) {
+      console.log('✅ Detected working BOG callback format (matches PHP implementation)');
+      // Handle BOG callback with payment details in body
+      return await handleBogPaymentDetails(callbackData.body, res);
+    }
+    
+    // Check if this is the documented format
+    const isDocumentedFormat = callbackData.event === 'order_payment' && callbackData.body;
+    
+    if (isDocumentedFormat) {
+      console.log('✅ Detected documented BOG callback format');
       // Validate that body has required fields
       const paymentDetails = callbackData.body;
       if (!paymentDetails.order_id && !paymentDetails.external_order_id) {
@@ -404,35 +413,46 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
     }
     
     // Fallback: check if payment details are sent directly (without wrapper)
-    // This might happen in testing or if BOG changes their format
     const isDirectPaymentDetails = callbackData.order_id && callbackData.order_status;
     if (isDirectPaymentDetails) {
-      console.log('⚠️  Detected direct payment details format (non-standard)');
+      console.log('⚠️  Detected direct payment details format (testing/fallback)');
       return await handleBogPaymentDetails(callbackData, res);
     }
     
     // Unknown format - provide detailed error information
     console.log('❌ Unknown callback format received');
-    console.log('Expected: { event: "order_payment", body: { order_id, external_order_id, ... } }');
+    console.log('Expected formats:');
+    console.log('1. Working format: { body: { external_order_id, order_status: { key: "completed" } } }');
+    console.log('2. Documented format: { event: "order_payment", body: { ... } }');
     console.log('Received keys:', Object.keys(callbackData));
     
     res.status(400).json({
       error: 'Invalid callback format',
-      message: 'Expected BOG callback format with event=order_payment and body containing payment details',
-      expected_format: {
-        event: 'order_payment',
-        zoned_request_time: 'ISO timestamp',
-        body: {
-          order_id: 'BOG order ID',
-          external_order_id: 'Your order ID',
-          order_status: { key: 'completed|rejected|...', value: 'description' }
+      message: 'Expected BOG callback with body containing payment details',
+      expected_formats: {
+        working: {
+          body: {
+            external_order_id: 'Your order ID',
+            order_status: { key: 'completed|rejected|...' },
+            payment_detail: { transaction_id: 'BOG transaction ID' }
+          }
+        },
+        documented: {
+          event: 'order_payment',
+          zoned_request_time: 'ISO timestamp',
+          body: {
+            order_id: 'BOG order ID',
+            external_order_id: 'Your order ID',
+            order_status: { key: 'completed|rejected|...', value: 'description' }
+          }
         }
       },
       received_format: {
         keys: Object.keys(callbackData),
+        has_body: !!callbackData.body,
         has_event: !!callbackData.event,
         event_value: callbackData.event,
-        has_body: !!callbackData.body
+        body_keys: callbackData.body ? Object.keys(callbackData.body) : []
       }
     });
     return;
