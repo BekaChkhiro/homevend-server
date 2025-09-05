@@ -164,9 +164,16 @@ export interface BogPaymentDetails {
 }
 
 export interface BogCallbackData {
-  event: 'order_payment';
-  zoned_request_time: string;
-  body: BogPaymentDetails;
+  event?: string; // More flexible - BOG might send different event names
+  zoned_request_time?: string;
+  body: Partial<BogPaymentDetails> & {
+    // Ensure at least one identifier is present
+    order_id?: string;
+    external_order_id?: string;
+    // Allow alternative status field names
+    status?: string;
+    payment_status?: string;
+  };
 }
 
 export interface BogRefundRequest {
