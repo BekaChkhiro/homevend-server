@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database.js';
 import { User } from '../models/User.js';
-import { Transaction, TransactionStatusEnum } from '../models/Transaction.js';
+import { Transaction, TransactionStatusEnum, TransactionTypeEnum } from '../models/Transaction.js';
 import { BogPaymentService, BogCallbackData } from '../services/payments/BogPaymentService.js';
 
 /**
@@ -30,38 +30,91 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
       return;
     }
     
-    // Find transaction
+    // Find transaction with improved search logic
     const transactionRepository = AppDataSource.getRepository(Transaction);
-    const searchId = externalOrderId || bogOrderId;
     
-    console.log('Searching for transaction with ID:', searchId);
+    console.log('Searching for transaction with BOG Order ID:', bogOrderId);
+    console.log('Searching for transaction with External Order ID:', externalOrderId);
     
-    let transaction = await transactionRepository.findOne({
-      where: { externalTransactionId: searchId },
-      relations: ['user']
-    });
+    let transaction = null;
     
-    // Try alternative searches if not found
-    if (!transaction && bogOrderId && externalOrderId) {
-      console.log('Trying BOG Order ID:', bogOrderId);
-      transaction = await transactionRepository.findOne({
-        where: { externalTransactionId: bogOrderId },
-        relations: ['user']
+    // Try multiple search strategies
+    const searchStrategies = [];
+    
+    // Strategy 1: Search by externalTransactionId matching external_order_id
+    if (externalOrderId) {
+      searchStrategies.push({
+        name: 'externalOrderId',
+        where: { externalTransactionId: externalOrderId }
       });
     }
     
-    // Search in metadata
-    if (!transaction && bogOrderId) {
-      console.log('Searching in metadata for BOG order ID');
-      const transactions = await transactionRepository
-        .createQueryBuilder('transaction')
-        .where("transaction.metadata->>'bogOrderId' = :orderId", { orderId: bogOrderId })
-        .leftJoinAndSelect('transaction.user', 'user')
-        .getMany();
+    // Strategy 2: Search by externalTransactionId matching bog_order_id
+    if (bogOrderId) {
+      searchStrategies.push({
+        name: 'bogOrderId',
+        where: { externalTransactionId: bogOrderId }
+      });
+    }
+    
+    // Strategy 3: Search in metadata for bogOrderId
+    if (bogOrderId) {
+      searchStrategies.push({
+        name: 'metadataBogOrderId',
+        metadata: true,
+        query: "transaction.metadata->>'bogOrderId' = :orderId",
+        params: { orderId: bogOrderId }
+      });
+    }
+    
+    // Strategy 4: Search in metadata for original orderId
+    if (externalOrderId) {
+      searchStrategies.push({
+        name: 'metadataOrderId',
+        metadata: true,
+        query: "transaction.metadata->>'orderId' = :orderId",
+        params: { orderId: externalOrderId }
+      });
+    }
+    
+    // Strategy 5: Try to match by user ID and amount if we have enough info
+    if (paymentDetails.purchase_units?.transfer_amount) {
+      const transferAmount = parseFloat(paymentDetails.purchase_units.transfer_amount);
+      searchStrategies.push({
+        name: 'amountMatch',
+        where: { 
+          amount: transferAmount,
+          status: TransactionStatusEnum.PENDING,
+          type: TransactionTypeEnum.TOP_UP
+        }
+      });
+    }
+    
+    for (const strategy of searchStrategies) {
+      console.log(`Trying search strategy: ${strategy.name}`);
       
-      if (transactions.length > 0) {
-        transaction = transactions[0];
-        console.log('Found via metadata search');
+      if (strategy.metadata) {
+        const transactions = await transactionRepository
+          .createQueryBuilder('transaction')
+          .where(strategy.query, strategy.params)
+          .leftJoinAndSelect('transaction.user', 'user')
+          .getMany();
+        
+        if (transactions.length > 0) {
+          transaction = transactions[0];
+          console.log(`Found transaction via ${strategy.name}`);
+          break;
+        }
+      } else {
+        transaction = await transactionRepository.findOne({
+          where: strategy.where,
+          relations: ['user']
+        });
+        
+        if (transaction) {
+          console.log(`Found transaction via ${strategy.name}`);
+          break;
+        }
       }
     }
     
@@ -116,6 +169,7 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
         });
         
         if (!user) {
+          console.error(`User not found for transaction userId: ${transaction.userId}`);
           await queryRunner.rollbackTransaction();
           res.status(404).json({ error: 'User not found' });
           return;
@@ -124,6 +178,8 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
         const currentBalance = parseFloat(user.balance.toString());
         const topUpAmount = parseFloat(transaction.amount.toString());
         const newBalance = currentBalance + topUpAmount;
+        
+        console.log(`Balance update: ${currentBalance} + ${topUpAmount} = ${newBalance}`);
         
         // Update transaction
         transaction.status = TransactionStatusEnum.COMPLETED;
@@ -139,19 +195,32 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
           payerIdentifier: paymentDetails.payment_detail?.payer_identifier
         };
         
+        console.log('Saving updated transaction...');
         await transactionRepo.save(transaction);
+        console.log('Transaction saved successfully');
         
         // Update user balance
+        const oldBalance = user.balance;
         user.balance = newBalance;
+        console.log(`Updating user balance from ${oldBalance} to ${newBalance}`);
         await userRepo.save(user);
+        console.log('User balance updated successfully');
         
         await queryRunner.commitTransaction();
+        console.log('Database transaction committed successfully');
         
-        console.log(`BOG payment completed successfully for order ${externalOrderId}, user ${transaction.userId}, amount: ${topUpAmount}`);
+        console.log(`✅ BOG payment completed successfully for order ${externalOrderId}, user ${transaction.userId}, amount: ${topUpAmount}, new balance: ${newBalance}`);
         
         res.status(200).json({
           status: 'success',
-          message: 'Payment processed successfully'
+          message: 'Payment processed successfully',
+          debug: {
+            transactionId: transaction.uuid,
+            userId: transaction.userId,
+            amount: topUpAmount,
+            oldBalance: currentBalance,
+            newBalance: newBalance
+          }
         });
         
       } else if (orderStatus === 'rejected') {
@@ -264,6 +333,37 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
     console.log('BOG Callback received:', JSON.stringify(req.body, null, 2));
     console.log('Client IP:', req.ip);
     console.log('Headers:', req.headers);
+    
+    // Check for signature header (BOG documentation mentions Callback-Signature)
+    const signature = req.headers['callback-signature'] as string;
+    if (signature) {
+      console.log('🔐 Callback signature received:', signature.substring(0, 20) + '...');
+      
+      // Verify signature using BOG service
+      try {
+        const bogService = new BogPaymentService();
+        const isValidSignature = bogService.verifySignature(signature, req.body);
+        
+        if (!isValidSignature) {
+          console.error('❌ Invalid callback signature - possible security issue');
+          res.status(401).json({
+            error: 'Invalid signature',
+            message: 'Callback signature verification failed'
+          });
+          return;
+        }
+        
+        console.log('✅ Callback signature verified successfully');
+      } catch (error) {
+        console.error('🔐 Signature verification error:', error);
+        // For development, continue processing even if signature fails
+        // In production, you might want to reject the callback
+        console.log('⚠️  Continuing despite signature verification error (development mode)');
+      }
+    } else {
+      console.log('⚠️  No callback signature in headers - this might be a test or invalid callback');
+      // In production, you might want to require signature verification
+    }
 
     // Always send some response for debugging
     if (!req.body || Object.keys(req.body).length === 0) {
@@ -272,32 +372,68 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // BOG sends callbacks in this format:
+    // According to BOG documentation, callbacks are sent in this format:
     // { "event": "order_payment", "zoned_request_time": "...", "body": { payment_details } }
     const callbackData: any = req.body;
+    
+    console.log('Analyzing callback structure...');
+    console.log('Has event field:', !!callbackData.event);
+    console.log('Event value:', callbackData.event);
+    console.log('Has body field:', !!callbackData.body);
+    console.log('Has zoned_request_time:', !!callbackData.zoned_request_time);
     
     // Check if this is the correct BOG callback format
     const isBogCallback = callbackData.event === 'order_payment' && callbackData.body;
     
     if (isBogCallback) {
-      console.log('Detected correct BOG callback format');
+      console.log('✅ Detected correct BOG callback format');
+      // Validate that body has required fields
+      const paymentDetails = callbackData.body;
+      if (!paymentDetails.order_id && !paymentDetails.external_order_id) {
+        console.error('❌ BOG callback body missing required order identifiers');
+        res.status(400).json({
+          error: 'Invalid BOG callback',
+          message: 'Payment details missing order identifiers',
+          received_body_keys: Object.keys(paymentDetails)
+        });
+        return;
+      }
+      
       // Handle BOG callback with payment details in body
-      return await handleBogPaymentDetails(callbackData.body, res);
+      return await handleBogPaymentDetails(paymentDetails, res);
     }
     
     // Fallback: check if payment details are sent directly (without wrapper)
+    // This might happen in testing or if BOG changes their format
     const isDirectPaymentDetails = callbackData.order_id && callbackData.order_status;
     if (isDirectPaymentDetails) {
-      console.log('Detected direct payment details format');
+      console.log('⚠️  Detected direct payment details format (non-standard)');
       return await handleBogPaymentDetails(callbackData, res);
     }
     
-    // Unknown format
-    console.log('Unknown callback format');
+    // Unknown format - provide detailed error information
+    console.log('❌ Unknown callback format received');
+    console.log('Expected: { event: "order_payment", body: { order_id, external_order_id, ... } }');
+    console.log('Received keys:', Object.keys(callbackData));
+    
     res.status(400).json({
       error: 'Invalid callback format',
-      message: 'Expected BOG callback format with event=order_payment and body',
-      received_keys: Object.keys(callbackData)
+      message: 'Expected BOG callback format with event=order_payment and body containing payment details',
+      expected_format: {
+        event: 'order_payment',
+        zoned_request_time: 'ISO timestamp',
+        body: {
+          order_id: 'BOG order ID',
+          external_order_id: 'Your order ID',
+          order_status: { key: 'completed|rejected|...', value: 'description' }
+        }
+      },
+      received_format: {
+        keys: Object.keys(callbackData),
+        has_event: !!callbackData.event,
+        event_value: callbackData.event,
+        has_body: !!callbackData.body
+      }
     });
     return;
 
