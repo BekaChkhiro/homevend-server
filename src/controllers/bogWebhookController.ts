@@ -9,16 +9,44 @@ import { BogPaymentService, BogCallbackData } from '../services/payments/BogPaym
  */
 export const handleBogCallback = async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('=== BOG CALLBACK START ===');
     console.log('BOG Callback received:', JSON.stringify(req.body, null, 2));
     console.log('Client IP:', req.ip);
     console.log('Headers:', req.headers);
 
+    // Always send some response for debugging
+    if (!req.body || Object.keys(req.body).length === 0) {
+      console.log('Empty callback body received');
+      res.status(400).json({ error: 'Empty callback body' });
+      return;
+    }
+
     const callbackData: BogCallbackData = req.body;
     
     // Validate required fields
-    if (!callbackData.event || !callbackData.body || !callbackData.body.order_id) {
-      console.error('Invalid BOG callback data - missing required fields');
-      res.status(400).json({ error: 'Invalid callback data' });
+    console.log('Validating callback data...');
+    console.log('Event:', callbackData.event);
+    console.log('Body exists:', !!callbackData.body);
+    console.log('Order ID:', callbackData.body?.order_id);
+    console.log('External Order ID:', callbackData.body?.external_order_id);
+    
+    // More lenient validation - only require body with some identifier
+    if (!callbackData.body) {
+      console.error('Invalid BOG callback data - missing body');
+      res.status(400).json({ 
+        error: 'Invalid callback data',
+        message: 'Missing request body' 
+      });
+      return;
+    }
+    
+    // Accept either order_id or external_order_id
+    if (!callbackData.body.order_id && !callbackData.body.external_order_id) {
+      console.error('Invalid BOG callback data - missing order identifiers');
+      res.status(400).json({ 
+        error: 'Invalid callback data',
+        message: 'Missing order_id or external_order_id' 
+      });
       return;
     }
 
@@ -33,18 +61,64 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
       }
     }
 
-    // Find transaction by external order ID
+    // Find transaction by external order ID or BOG order ID
+    const searchId = callbackData.body.external_order_id || callbackData.body.order_id;
+    console.log('Searching for transaction with ID:', searchId);
+    
     const transactionRepository = AppDataSource.getRepository(Transaction);
     const userRepository = AppDataSource.getRepository(User);
 
-    const transaction = await transactionRepository.findOne({
-      where: { externalTransactionId: callbackData.body.external_order_id },
+    // Try to find by external transaction ID first
+    let transaction = await transactionRepository.findOne({
+      where: { externalTransactionId: searchId },
       relations: ['user']
     });
+    
+    // If not found and we have both IDs, try the other one
+    if (!transaction && callbackData.body.external_order_id && callbackData.body.order_id) {
+      console.log('Trying alternate ID:', callbackData.body.order_id);
+      transaction = await transactionRepository.findOne({
+        where: { externalTransactionId: callbackData.body.order_id },
+        relations: ['user']
+      });
+    }
+    
+    // Also try to find by metadata containing the BOG order ID
+    if (!transaction && callbackData.body.order_id) {
+      console.log('Searching by metadata for BOG order ID:', callbackData.body.order_id);
+      const transactions = await transactionRepository
+        .createQueryBuilder('transaction')
+        .where("transaction.metadata->>'bogOrderId' = :orderId", { orderId: callbackData.body.order_id })
+        .orWhere("transaction.metadata->>'order_id' = :orderId2", { orderId2: callbackData.body.order_id })
+        .leftJoinAndSelect('transaction.user', 'user')
+        .getMany();
+      
+      if (transactions.length > 0) {
+        transaction = transactions[0];
+        console.log('Found transaction via metadata search');
+      }
+    }
+
+    console.log('Transaction found:', !!transaction);
+    if (transaction) {
+      console.log('Transaction UUID:', transaction.uuid);
+      console.log('Transaction Status:', transaction.status);
+      console.log('Transaction User ID:', transaction.userId);
+      console.log('Transaction Amount:', transaction.amount);
+    }
 
     if (!transaction) {
-      console.error('Transaction not found for external_order_id:', callbackData.body.external_order_id);
-      res.status(404).json({ error: 'Transaction not found' });
+      console.error('Transaction not found for ID:', searchId);
+      console.error('Searched external_order_id:', callbackData.body.external_order_id);
+      console.error('Searched order_id:', callbackData.body.order_id);
+      
+      // Log but don't fail - BOG might be sending test callbacks
+      res.status(200).json({ 
+        status: 'acknowledged',
+        message: 'Transaction not found, callback logged',
+        order_id: callbackData.body.order_id,
+        external_order_id: callbackData.body.external_order_id
+      });
       return;
     }
 
@@ -74,9 +148,15 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
         bogOrderId: callbackData.body.order_id
       };
 
-      const orderStatus = callbackData.body.order_status.key;
+      // Handle various possible status field names
+      const orderStatus = callbackData.body.order_status?.key || 
+                         callbackData.body.status || 
+                         callbackData.body.payment_status;
+      console.log('Processing order status:', orderStatus);
+      console.log('Full order_status object:', JSON.stringify(callbackData.body.order_status));
       
       if (orderStatus === 'completed') {
+        console.log('Processing completed payment...');
         // Payment successful - complete the transaction
         const user = await userRepo.findOne({
           where: { id: transaction.userId },
@@ -114,6 +194,7 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
         await userRepo.save(user);
 
         await queryRunner.commitTransaction();
+        console.log('Transaction committed successfully');
 
         console.log(`BOG payment completed successfully for order ${callbackData.body.external_order_id}, user ${transaction.userId}, amount: ${topUpAmount}`);
         
@@ -123,6 +204,7 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
         });
 
       } else if (orderStatus === 'rejected') {
+        console.log('Processing rejected payment...');
         // Payment failed
         transaction.status = TransactionStatusEnum.FAILED;
         transaction.metadata = {
@@ -145,6 +227,7 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
         });
 
       } else if (orderStatus === 'refunded' || orderStatus === 'refunded_partially') {
+        console.log('Processing refund...');
         // Payment refunded - check if we need to adjust user balance first
         const wasCompleted = (originalStatus as TransactionStatusEnum) === TransactionStatusEnum.COMPLETED;
         
@@ -185,6 +268,7 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
         });
 
       } else {
+        console.log('Processing other status:', orderStatus);
         // Other statuses (created, processing, etc.)
         transaction.metadata = {
           ...updatedMetadata,
@@ -203,6 +287,7 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
       }
 
     } catch (error) {
+      console.error('Database transaction error:', error);
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
@@ -211,11 +296,20 @@ export const handleBogCallback = async (req: Request, res: Response): Promise<vo
 
   } catch (error) {
     console.error('BOG callback processing error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: 'Failed to process payment callback'
-    });
+    console.error('Error stack:', error.stack);
+    console.error('Request body was:', JSON.stringify(req.body));
+    
+    // Always return a response
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: 'Failed to process payment callback',
+        details: error.message
+      });
+    }
   }
+  
+  console.log('=== BOG CALLBACK END ===');
 };
 
 /**
