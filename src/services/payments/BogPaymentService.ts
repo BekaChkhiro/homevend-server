@@ -164,16 +164,9 @@ export interface BogPaymentDetails {
 }
 
 export interface BogCallbackData {
-  event?: string; // More flexible - BOG might send different event names
-  zoned_request_time?: string;
-  body: Partial<BogPaymentDetails> & {
-    // Ensure at least one identifier is present
-    order_id?: string;
-    external_order_id?: string;
-    // Allow alternative status field names
-    status?: string;
-    payment_status?: string;
-  };
+  event: 'order_payment'; // BOG always sends this value
+  zoned_request_time: string; // Callback timestamp in UTC
+  body: BogPaymentDetails; // Complete payment details as per BOG API
 }
 
 export interface BogRefundRequest {
