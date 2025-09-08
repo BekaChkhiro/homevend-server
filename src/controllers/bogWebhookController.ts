@@ -12,18 +12,22 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
   console.log('Payment Details:', JSON.stringify(paymentDetails, null, 2));
   
   try {
-    // Extract identifiers
+    // Extract identifiers and status based on actual BOG API docs
     const bogOrderId = paymentDetails.order_id;
     const externalOrderId = paymentDetails.external_order_id;
     const orderStatus = paymentDetails.order_status?.key;
-    const statusCode = paymentDetails.order_status?.code || paymentDetails.status_code;
-    const statusDescription = paymentDetails.order_status?.value;
+    const orderStatusValue = paymentDetails.order_status?.value;
+    
+    // Status code is in payment_detail.code according to BOG API docs
+    const paymentStatusCode = paymentDetails.payment_detail?.code;
+    const paymentCodeDescription = paymentDetails.payment_detail?.code_description;
     
     console.log('BOG Order ID:', bogOrderId);
     console.log('External Order ID:', externalOrderId);
     console.log('Order Status Key:', orderStatus);
-    console.log('Status Code:', statusCode);
-    console.log('Status Description:', statusDescription);
+    console.log('Order Status Value:', orderStatusValue);
+    console.log('Payment Status Code:', paymentStatusCode);
+    console.log('Payment Code Description:', paymentCodeDescription);
     
     if (!bogOrderId && !externalOrderId) {
       console.error('No order identifiers found in payment details');
@@ -193,8 +197,8 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
         bogOrderId: bogOrderId
       };
       
-      // Handle successful payments - BOG sends status code 100 for successful payments
-      if (orderStatus === 'completed' || statusCode === 100 || statusCode === '100') {
+      // Handle successful payments - BOG sends payment status code "100" for successful payments
+      if (orderStatus === 'completed' || paymentStatusCode === '100') {
         console.log('✅ Processing completed payment...');
         console.log('Transaction ID:', transaction.uuid);
         console.log('User ID:', transaction.userId);
@@ -230,8 +234,10 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
           ...updatedMetadata,
           completedAt: new Date().toISOString(),
           bogPaymentStatus: 'completed',
-          bogStatusCode: statusCode,
-          bogStatusDescription: statusDescription,
+          paymentStatusCode: paymentStatusCode,
+          paymentCodeDescription: paymentCodeDescription,
+          orderStatus: orderStatus,
+          orderStatusValue: orderStatusValue,
           transferAmount: paymentDetails.purchase_units?.transfer_amount || transaction.amount.toString(),
           bogTransactionId: paymentDetails.payment_detail?.transaction_id,
           paymentMethod: paymentDetails.payment_detail?.transfer_method?.key,
@@ -272,9 +278,10 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
           }
         });
         
-      } else if (orderStatus === 'rejected' || (statusCode && statusCode !== 100 && statusCode !== '100' && statusCode !== 200 && statusCode !== '200')) {
-        console.log(`Processing rejected/failed payment with status code: ${statusCode}`);
-        console.log(`Status description: ${statusDescription}`);
+      } else if (orderStatus === 'rejected' || (paymentStatusCode && paymentStatusCode !== '100' && paymentStatusCode !== '200')) {
+        console.log(`Processing rejected/failed payment with payment code: ${paymentStatusCode}`);
+        console.log(`Payment code description: ${paymentCodeDescription}`);
+        console.log(`Order status: ${orderStatus} (${orderStatusValue})`);
         
         transaction.status = TransactionStatusEnum.FAILED;
         transaction.metadata = {
@@ -282,10 +289,10 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
           bogPaymentStatus: 'rejected',
           failedAt: new Date().toISOString(),
           rejectReason: paymentDetails.reject_reason,
-          paymentCode: paymentDetails.payment_detail?.code,
-          paymentCodeDescription: paymentDetails.payment_detail?.code_description,
-          bogStatusCode: statusCode,
-          bogStatusDescription: statusDescription
+          paymentStatusCode: paymentStatusCode,
+          paymentCodeDescription: paymentCodeDescription,
+          orderStatus: orderStatus,
+          orderStatusValue: orderStatusValue
         };
         
         await transactionRepo.save(transaction);
@@ -337,16 +344,19 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
           message: `Payment ${orderStatus}`
         });
         
-      } else if (statusCode === 200 || statusCode === '200') {
+      } else if (paymentStatusCode === '200') {
         console.log('Processing preauthorization...');
-        console.log(`Status Code: ${statusCode} - ${statusDescription}`);
+        console.log(`Payment Status Code: ${paymentStatusCode} - ${paymentCodeDescription}`);
+        console.log(`Order Status: ${orderStatus} (${orderStatusValue})`);
         
         // For preauthorization, update metadata but keep transaction pending
         transaction.metadata = {
           ...updatedMetadata,
           bogPaymentStatus: 'preauthorized',
-          bogStatusCode: statusCode,
-          bogStatusDescription: statusDescription,
+          paymentStatusCode: paymentStatusCode,
+          paymentCodeDescription: paymentCodeDescription,
+          orderStatus: orderStatus,
+          orderStatusValue: orderStatusValue,
           preauthorizedAt: new Date().toISOString()
         };
         
@@ -362,24 +372,27 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
         
       } else {
         console.log('Processing unknown status:', orderStatus);
-        console.log(`Status Code: ${statusCode} - ${statusDescription}`);
+        console.log(`Payment Status Code: ${paymentStatusCode} - ${paymentCodeDescription}`);
+        console.log(`Order Status: ${orderStatus} (${orderStatusValue})`);
         
         transaction.metadata = {
           ...updatedMetadata,
           bogPaymentStatus: orderStatus || 'unknown',
-          bogStatusCode: statusCode,
-          bogStatusDescription: statusDescription,
+          paymentStatusCode: paymentStatusCode,
+          paymentCodeDescription: paymentCodeDescription,
+          orderStatus: orderStatus,
+          orderStatusValue: orderStatusValue,
           unknownStatusAt: new Date().toISOString()
         };
         
         await transactionRepo.save(transaction);
         await queryRunner.commitTransaction();
         
-        console.log(`BOG unknown status (${statusCode}: ${statusDescription}) for order ${externalOrderId}`);
+        console.log(`BOG unknown status (${paymentStatusCode}: ${paymentCodeDescription}) for order ${externalOrderId}`);
         
         res.status(200).json({
           status: 'acknowledged',
-          message: `Unknown status received: ${statusCode} - ${statusDescription}`
+          message: `Unknown status received: ${paymentStatusCode} - ${paymentCodeDescription}`
         });
       }
       
