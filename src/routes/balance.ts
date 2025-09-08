@@ -15,6 +15,7 @@ import { AppDataSource } from '../config/database.js';
 import { Transaction, TransactionStatusEnum, TransactionTypeEnum } from '../models/Transaction.js';
 import { BogPaymentService } from '../services/payments/BogPaymentService.js';
 import { verifySinglePayment, paymentVerificationScheduler } from '../utils/paymentVerification.js';
+import { LessThan } from 'typeorm';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ const router = Router();
 router.post('/flitt/callback', handleFlittCallback);
 router.post('/bog/callback', handleBogCallback);
 
-// Debug endpoint to check pending BOG transactions (no auth for testing)
+// Debug endpoint to check pending BOG transactions (no auth for testing - temporarily)
 router.get('/bog/debug/pending', async (req: Request, res: Response) => {
   try {
     const transactionRepository = AppDataSource.getRepository(Transaction);
@@ -115,6 +116,65 @@ router.post('/bog/test-callback', async (req: Request, res: Response) => {
   // Forward to actual BOG callback handler
   req.body = testCallback;
   return handleBogCallback(req, res);
+});
+
+// Admin endpoint to cleanup old invalid transactions (no auth for testing)
+router.post('/bog/cleanup', async (req: Request, res: Response) => {
+  try {
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    // Find old pending BOG transactions (more than 1 hour old for testing)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    
+    const oldTransactions = await transactionRepository.find({
+      where: {
+        type: TransactionTypeEnum.TOP_UP,
+        status: TransactionStatusEnum.PENDING,
+        paymentMethod: 'bog',
+        createdAt: LessThan(oneHourAgo)
+      }
+    });
+    
+    if (oldTransactions.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No old pending transactions to cleanup',
+        cleaned: 0
+      });
+    }
+    
+    let cleaned = 0;
+    for (const transaction of oldTransactions) {
+      const bogOrderId = transaction.metadata?.bogOrderId || 
+        (!transaction.externalTransactionId?.startsWith('topup_') ? transaction.externalTransactionId : null);
+      
+      if (!bogOrderId || bogOrderId.startsWith('topup_')) {
+        transaction.status = TransactionStatusEnum.FAILED;
+        transaction.metadata = {
+          ...transaction.metadata,
+          cleanupReason: 'No valid BOG order ID found',
+          cleanedUpAt: new Date().toISOString()
+        };
+        await transactionRepository.save(transaction);
+        cleaned++;
+      }
+    }
+    
+    return res.json({
+      success: true,
+      message: `Cleaned up ${cleaned} invalid transactions`,
+      total: oldTransactions.length,
+      cleaned
+    });
+    
+  } catch (error: any) {
+    console.error('Cleanup error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to cleanup transactions',
+      error: error.message
+    });
+  }
 });
 
 // Manual payment verification endpoint (requires authentication)
