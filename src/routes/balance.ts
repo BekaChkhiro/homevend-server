@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { AuthenticatedRequest } from '../types/auth.js';
 import {
   getUserBalance,
   processTopUp,
@@ -13,8 +14,9 @@ import { handleBogCallback, handleBogPaymentDetails } from '../controllers/bogWe
 import { authenticate } from '../middleware/auth.js';
 import { AppDataSource } from '../config/database.js';
 import { Transaction, TransactionStatusEnum, TransactionTypeEnum } from '../models/Transaction.js';
+import { User } from '../models/User.js';
 import { BogPaymentService } from '../services/payments/BogPaymentService.js';
-import { verifySinglePayment, paymentVerificationScheduler } from '../utils/paymentVerification.js';
+import { verifySinglePayment, paymentVerificationScheduler, verifyUserPendingPayments } from '../utils/paymentVerification.js';
 import { LessThan } from 'typeorm';
 
 const router = Router();
@@ -54,6 +56,36 @@ router.get('/bog/debug/pending', async (req: Request, res: Response) => {
     });
   } catch (error) {
     res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Test immediate verification (no auth for testing)
+router.post('/bog/test-verify-user/:userId', async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    if (!userId) {
+      return res.status(400).json({
+        error: 'Invalid user ID'
+      });
+    }
+    
+    console.log(`🧪 Testing immediate verification for user ${userId}`);
+    
+    const results = await verifyUserPendingPayments(userId);
+    
+    return res.json({
+      success: true,
+      message: `Tested verification for user ${userId}`,
+      results: results
+    });
+    
+  } catch (error: any) {
+    console.error('Test verification error:', error);
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -264,6 +296,123 @@ router.post('/bog/verify-all', authenticate, async (req: Request, res: Response)
 
 // All other balance routes require authentication
 router.use(authenticate);
+
+// Immediate payment verification for current user
+router.post('/verify-payments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    
+    console.log(`🔄 Immediate verification requested for user ${userId}`);
+    
+    // Verify all pending payments for this user
+    const results = await verifyUserPendingPayments(userId);
+    
+    // Check if any payments were completed
+    const completed = results.filter(r => r.status === 'completed');
+    const failed = results.filter(r => r.status === 'failed');
+    const pending = results.filter(r => r.status === 'pending');
+    const errors = results.filter(r => r.status === 'error');
+    
+    // Get updated user balance
+    const userRepository = AppDataSource.getRepository(User);
+    const updatedUser = await userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'balance']
+    });
+    
+    const response = {
+      success: true,
+      message: `Verified ${results.length} pending transactions`,
+      currentBalance: updatedUser?.balance ? parseFloat(updatedUser.balance.toString()) : 0,
+      verification: {
+        total: results.length,
+        completed: completed.length,
+        failed: failed.length,
+        pending: pending.length,
+        errors: errors.length
+      },
+      results: results.map(r => ({
+        transactionId: r.transactionId,
+        status: r.status,
+        message: r.message,
+        balanceUpdate: r.balanceUpdate
+      })),
+      // Indicate if user should refresh their balance
+      balanceUpdated: completed.length > 0
+    };
+    
+    if (completed.length > 0) {
+      console.log(`✅ User ${userId}: ${completed.length} payments completed, balance updated`);
+    }
+    
+    res.json(response);
+    
+  } catch (error: any) {
+    console.error('Immediate verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify payments',
+      error: error.message
+    });
+  }
+});
+
+// Check payment status for a specific transaction (for polling)
+router.get('/payment-status/:transactionId', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { transactionId } = req.params;
+    
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    // Find the transaction for this user
+    const transaction = await transactionRepository.findOne({
+      where: [
+        { uuid: transactionId, userId: userId },
+        { externalTransactionId: transactionId, userId: userId }
+      ],
+      select: ['uuid', 'status', 'amount', 'balanceAfter', 'createdAt', 'metadata']
+    });
+    
+    if (!transaction) {
+      res.status(404).json({
+        success: false,
+        message: 'Transaction not found'
+      });
+      return;
+    }
+    
+    // If still pending, we could trigger verification but not wait for it
+    if (transaction.status === TransactionStatusEnum.PENDING) {
+      // Trigger async verification without waiting
+      verifyUserPendingPayments(userId).catch(error => {
+        console.error(`Background verification error for user ${userId}:`, error);
+      });
+    }
+    
+    res.json({
+      success: true,
+      transaction: {
+        id: transaction.uuid,
+        status: transaction.status,
+        amount: parseFloat(transaction.amount.toString()),
+        balanceAfter: transaction.balanceAfter ? parseFloat(transaction.balanceAfter.toString()) : null,
+        createdAt: transaction.createdAt.toISOString(),
+        isPending: transaction.status === TransactionStatusEnum.PENDING,
+        isCompleted: transaction.status === TransactionStatusEnum.COMPLETED,
+        isFailed: transaction.status === TransactionStatusEnum.FAILED
+      }
+    });
+    
+  } catch (error: any) {
+    console.error('Payment status check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check payment status',
+      error: error.message
+    });
+  }
+});
 
 // Get user balance and recent transactions
 router.get('/', getUserBalance);

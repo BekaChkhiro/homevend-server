@@ -329,6 +329,18 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
         console.log('  - External Transaction ID (BOG ID):', bogOrderId);
         console.log('  - Original Order ID (our ID):', orderId);
         console.log('  - Transaction UUID:', transaction.uuid);
+        
+        // Schedule immediate verification for this user after a short delay
+        // This gives time for the user to complete payment before we check
+        setTimeout(async () => {
+          try {
+            console.log(`⏰ Running scheduled verification for user ${userId} after BOG payment initiation`);
+            const { verifyUserPendingPayments } = await import('../utils/paymentVerification.js');
+            await verifyUserPendingPayments(userId);
+          } catch (error) {
+            console.error(`Error in scheduled verification for user ${userId}:`, error);
+          }
+        }, 2 * 60 * 1000); // Check after 2 minutes
 
         console.log('💰 Sending BOG Response to Frontend:', {
           success: true,
@@ -346,7 +358,11 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
             transactionId: transaction.uuid,
             checkoutUrl: redirectUrl,
             orderId: bogOrderId,
-            amount: topUpAmount
+            amount: topUpAmount,
+            // Include verification endpoint for client-side polling
+            verificationUrl: '/api/balance/verify-payments',
+            // Suggest client poll after user returns from payment
+            pollAfterSeconds: 10
           }
         });
 

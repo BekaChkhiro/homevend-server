@@ -490,3 +490,78 @@ export function startPaymentVerificationJob(intervalMinutes = 5): void {
 export function stopPaymentVerificationJob(): void {
   paymentVerificationScheduler.stop();
 }
+
+/**
+ * Verify pending payments for a specific user immediately
+ */
+export async function verifyUserPendingPayments(userId: number): Promise<VerificationResult[]> {
+  console.log(`🔄 Verifying pending payments for user ${userId}...`);
+  
+  const results: VerificationResult[] = [];
+  
+  try {
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    // Find pending BOG transactions for this specific user
+    const pendingTransactions = await transactionRepository.find({
+      where: {
+        userId: userId,
+        type: TransactionTypeEnum.TOP_UP,
+        status: TransactionStatusEnum.PENDING,
+        paymentMethod: 'bog'
+      },
+      relations: ['user'],
+      order: { createdAt: 'DESC' }
+    });
+    
+    if (pendingTransactions.length === 0) {
+      console.log(`✅ No pending BOG transactions for user ${userId}`);
+      return results;
+    }
+    
+    console.log(`📋 Found ${pendingTransactions.length} pending BOG transactions for user ${userId}`);
+    
+    const bogService = new BogPaymentService();
+    
+    // Process all user's transactions
+    for (const transaction of pendingTransactions) {
+      try {
+        const result = await processTransaction(transaction, bogService);
+        results.push(result);
+        
+        const icon = 
+          result.status === 'completed' ? '✅' :
+          result.status === 'failed' ? '❌' :
+          result.status === 'pending' ? '⏳' : '⚠️';
+        
+        console.log(`${icon} Transaction ${result.transactionId}: ${result.message}`);
+        
+        if (result.status === 'completed' && result.balanceUpdate) {
+          console.log(`  💰 Balance: ${result.balanceUpdate.oldBalance} → ${result.balanceUpdate.newBalance}`);
+        }
+      } catch (error: any) {
+        const errorResult: VerificationResult = {
+          transactionId: transaction.uuid,
+          status: 'error',
+          message: error.message
+        };
+        results.push(errorResult);
+        console.log(`⚠️ Error processing transaction ${transaction.uuid}: ${error.message}`);
+      }
+    }
+    
+    // Summary for user
+    const completed = results.filter(r => r.status === 'completed').length;
+    const failed = results.filter(r => r.status === 'failed').length;
+    const pending = results.filter(r => r.status === 'pending').length;
+    const errors = results.filter(r => r.status === 'error').length;
+    
+    console.log(`📊 User ${userId} verification complete: ${completed} completed, ${failed} failed, ${pending} pending, ${errors} errors`);
+    
+    return results;
+    
+  } catch (error: unknown) {
+    console.error(`❌ Error verifying payments for user ${userId}:`, error);
+    throw error;
+  }
+}
