@@ -41,11 +41,13 @@ router.get('/bog/debug/pending', async (req: Request, res: Response) => {
       count: pendingTransactions.length,
       transactions: pendingTransactions.map(tx => ({
         uuid: tx.uuid,
-        externalTransactionId: tx.externalTransactionId,
+        externalTransactionId: tx.externalTransactionId, // Now should contain BOG order ID
         amount: tx.amount,
         userId: tx.userId,
         userName: tx.user?.fullName,
         createdAt: tx.createdAt,
+        originalOrderId: tx.metadata?.originalOrderId, // Our internal order ID
+        bogOrderId: tx.metadata?.bogOrderId, // BOG's order ID (should match externalTransactionId)
         metadata: tx.metadata
       }))
     });
@@ -63,7 +65,8 @@ router.post('/bog/test-callback', async (req: Request, res: Response) => {
   
   if (!bogOrderId && !externalOrderId) {
     return res.status(400).json({
-      error: 'Please provide either bogOrderId or externalOrderId'
+      error: 'Please provide either bogOrderId or externalOrderId',
+      hint: 'For new transactions, use bogOrderId (BOG\'s order ID) for direct matching'
     });
   }
   
@@ -74,8 +77,8 @@ router.post('/bog/test-callback', async (req: Request, res: Response) => {
       const transactionRepository = AppDataSource.getRepository(Transaction);
       const transaction = await transactionRepository.findOne({
         where: [
-          { externalTransactionId: externalOrderId },
-          { externalTransactionId: bogOrderId }
+          { externalTransactionId: bogOrderId },
+          { externalTransactionId: externalOrderId }
         ]
       });
       if (transaction) {

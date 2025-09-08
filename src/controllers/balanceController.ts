@@ -314,20 +314,20 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           ? orderResult._links.redirect 
           : orderResult._links.redirect.href;
         
-        // Store BOTH the BOG order ID and our original order ID for flexible matching
-        // Keep the original orderId as externalTransactionId for backward compatibility
-        transaction.externalTransactionId = orderId; // Keep our original ID
+        // IMPORTANT: Store BOG's order_id as externalTransactionId for direct webhook matching
+        // This makes webhook lookup much more efficient and reliable
+        transaction.externalTransactionId = bogOrderId; // Use BOG's order ID as primary external ID
         transaction.metadata = {
           ...transaction.metadata,
-          originalOrderId: orderId,  // Keep original order ID for reference
-          bogOrderId: bogOrderId,    // Store BOG's order ID
+          originalOrderId: orderId,  // Keep our original order ID for reference
+          bogOrderId: bogOrderId,    // Also store BOG's order ID in metadata
           bogRedirectUrl: redirectUrl
         };
         await transactionRepository.save(transaction);
         
         console.log('📝 Transaction saved with IDs:');
-        console.log('  - External Transaction ID (our ID):', orderId);
-        console.log('  - BOG Order ID:', bogOrderId);
+        console.log('  - External Transaction ID (BOG ID):', bogOrderId);
+        console.log('  - Original Order ID (our ID):', orderId);
         console.log('  - Transaction UUID:', transaction.uuid);
 
         console.log('💰 Sending BOG Response to Frontend:', {
