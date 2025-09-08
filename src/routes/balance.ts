@@ -382,13 +382,29 @@ router.get('/payment-status/:transactionId', async (req: AuthenticatedRequest, r
       return;
     }
     
-    // If still pending, we could trigger verification but not wait for it
+    // If still pending, trigger immediate verification for this user
+    let verificationTriggered = false;
     if (transaction.status === TransactionStatusEnum.PENDING) {
-      // Trigger async verification without waiting
-      verifyUserPendingPayments(userId).catch(error => {
+      verificationTriggered = true;
+      console.log(`🔄 Payment status check: triggering verification for pending transaction ${transactionId}`);
+      
+      // Trigger async verification without waiting (but log the results)
+      verifyUserPendingPayments(userId).then(results => {
+        const completed = results.filter(r => r.status === 'completed').length;
+        if (completed > 0) {
+          console.log(`✅ Background verification completed ${completed} payments for user ${userId} during status check`);
+        }
+      }).catch(error => {
         console.error(`Background verification error for user ${userId}:`, error);
       });
     }
+    
+    // Get current user balance
+    const userRepository = AppDataSource.getRepository(User);
+    const currentUser = await userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'balance']
+    });
     
     res.json({
       success: true,
@@ -401,7 +417,9 @@ router.get('/payment-status/:transactionId', async (req: AuthenticatedRequest, r
         isPending: transaction.status === TransactionStatusEnum.PENDING,
         isCompleted: transaction.status === TransactionStatusEnum.COMPLETED,
         isFailed: transaction.status === TransactionStatusEnum.FAILED
-      }
+      },
+      currentBalance: currentUser ? parseFloat(currentUser.balance.toString()) : 0,
+      verificationTriggered: verificationTriggered
     });
     
   } catch (error: any) {

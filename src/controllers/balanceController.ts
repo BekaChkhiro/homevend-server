@@ -330,17 +330,37 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
         console.log('  - Original Order ID (our ID):', orderId);
         console.log('  - Transaction UUID:', transaction.uuid);
         
-        // Schedule immediate verification for this user after a short delay
-        // This gives time for the user to complete payment before we check
+        // Trigger immediate verification for this user (non-blocking)
+        // This will check if the payment was already completed (unlikely but possible)
+        // and provides a baseline check for the polling system
+        setImmediate(async () => {
+          try {
+            console.log(`🚀 Running immediate verification for user ${userId} after BOG payment initiation`);
+            const { verifyUserPendingPayments } = await import('../utils/paymentVerification.js');
+            const results = await verifyUserPendingPayments(userId);
+            
+            // Log results but don't block the response
+            const completed = results.filter(r => r.status === 'completed').length;
+            if (completed > 0) {
+              console.log(`✅ Immediate verification completed ${completed} payments for user ${userId}`);
+            } else {
+              console.log(`⏳ Immediate verification: no completed payments yet for user ${userId}`);
+            }
+          } catch (error) {
+            console.error(`Error in immediate verification for user ${userId}:`, error);
+          }
+        });
+
+        // Also schedule a delayed check as backup
         setTimeout(async () => {
           try {
-            console.log(`⏰ Running scheduled verification for user ${userId} after BOG payment initiation`);
+            console.log(`⏰ Running scheduled backup verification for user ${userId}`);
             const { verifyUserPendingPayments } = await import('../utils/paymentVerification.js');
             await verifyUserPendingPayments(userId);
           } catch (error) {
             console.error(`Error in scheduled verification for user ${userId}:`, error);
           }
-        }, 2 * 60 * 1000); // Check after 2 minutes
+        }, 2 * 60 * 1000); // Check after 2 minutes as backup
 
         console.log('💰 Sending BOG Response to Frontend:', {
           success: true,
@@ -359,10 +379,19 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
             checkoutUrl: redirectUrl,
             orderId: bogOrderId,
             amount: topUpAmount,
-            // Include verification endpoint for client-side polling
+            // Include verification endpoints for client-side polling
             verificationUrl: '/api/balance/verify-payments',
-            // Suggest client poll after user returns from payment
-            pollAfterSeconds: 10
+            paymentStatusUrl: `/api/balance/payment-status/${transaction.uuid}`,
+            // Instructions for frontend polling
+            polling: {
+              // Poll immediately when user returns from payment
+              immediateCheck: true,
+              // Then poll every 10 seconds for up to 5 minutes
+              intervalSeconds: 10,
+              maxAttempts: 30,
+              // If no success after 5 minutes, show manual verification button
+              fallbackMessage: 'Payment verification is taking longer than expected. Please click "Check Payment Status" to verify manually.'
+            }
           }
         });
 
