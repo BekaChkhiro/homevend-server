@@ -330,26 +330,15 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
         console.log('  - Original Order ID (our ID):', orderId);
         console.log('  - Transaction UUID:', transaction.uuid);
         
-        // Trigger immediate verification for this user (non-blocking)
-        // This will check if the payment was already completed (unlikely but possible)
-        // and provides a baseline check for the polling system
-        setImmediate(async () => {
-          try {
-            console.log(`🚀 Running immediate verification for user ${userId} after BOG payment initiation`);
-            const { verifyUserPendingPayments } = await import('../utils/paymentVerification.js');
-            const results = await verifyUserPendingPayments(userId);
-            
-            // Log results but don't block the response
-            const completed = results.filter(r => r.status === 'completed').length;
-            if (completed > 0) {
-              console.log(`✅ Immediate verification completed ${completed} payments for user ${userId}`);
-            } else {
-              console.log(`⏳ Immediate verification: no completed payments yet for user ${userId}`);
-            }
-          } catch (error) {
-            console.error(`Error in immediate verification for user ${userId}:`, error);
-          }
-        });
+        // NOTE: Don't trigger immediate verification here - user hasn't completed payment yet!
+        // Verification should be triggered when:
+        // 1. BOG webhook callback is received (automatic)
+        // 2. User returns to success page (frontend should call /verify-payments)
+        // 3. User manually clicks refresh/check status
+        console.log(`📝 BOG payment initiated for user ${userId}. Verification will be triggered by:`);
+        console.log(`   1. BOG webhook callback (automatic)`);
+        console.log(`   2. Frontend polling when user returns from payment`);
+        console.log(`   3. Scheduled backup verification in 2 minutes`);
 
         // Also schedule a delayed check as backup
         setTimeout(async () => {
@@ -382,10 +371,13 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
             // Include verification endpoints for client-side polling
             verificationUrl: '/api/balance/verify-payments',
             paymentStatusUrl: `/api/balance/payment-status/${transaction.uuid}`,
+            // NEW: Endpoint to call when user returns from BOG payment
+            returnVerificationUrl: '/api/balance/check-recent-payments',
             // Instructions for frontend polling
             polling: {
-              // Poll immediately when user returns from payment
+              // Call returnVerificationUrl immediately when user returns from payment
               immediateCheck: true,
+              returnFromPaymentEndpoint: '/api/balance/check-recent-payments',
               // Then poll every 10 seconds for up to 5 minutes
               intervalSeconds: 10,
               maxAttempts: 30,
