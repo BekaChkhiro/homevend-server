@@ -41,19 +41,19 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
     // Try multiple search strategies
     const searchStrategies = [];
     
-    // Strategy 1: Search by externalTransactionId matching external_order_id (PRIMARY - our order ID)
-    if (externalOrderId) {
-      searchStrategies.push({
-        name: 'externalOrderId',
-        where: { externalTransactionId: externalOrderId }
-      });
-    }
-    
-    // Strategy 2: Search by externalTransactionId matching bog_order_id (fallback)
+    // Strategy 1: Search by externalTransactionId matching BOG's order_id (PRIMARY METHOD)
     if (bogOrderId) {
       searchStrategies.push({
         name: 'bogOrderId',
         where: { externalTransactionId: bogOrderId }
+      });
+    }
+    
+    // Strategy 2: Search by externalTransactionId matching our original order_id (FALLBACK)
+    if (externalOrderId) {
+      searchStrategies.push({
+        name: 'externalOrderId',
+        where: { externalTransactionId: externalOrderId }
       });
     }
     
@@ -112,7 +112,7 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
         
         if (transactions.length > 0) {
           transaction = transactions[0];
-          console.log(`Found transaction via ${strategy.name}`);
+          console.log(`✅ Found transaction via ${strategy.name} (METADATA SEARCH)`);
           break;
         }
       } else {
@@ -122,7 +122,7 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
         });
         
         if (transaction) {
-          console.log(`Found transaction via ${strategy.name}`);
+          console.log(`✅ Found transaction via ${strategy.name} (${strategy.name === 'bogOrderId' ? 'DIRECT MATCH' : 'FALLBACK'})`);
           break;
         }
       }
