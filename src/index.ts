@@ -14,6 +14,7 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { sanitizeInput, preventSQLInjection } from './middleware/security.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
 import { initializeScheduler } from './utils/scheduler.js';
+import { startPaymentVerificationJob } from './utils/paymentVerification.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -81,6 +82,9 @@ const startServer = async () => {
     
     // Initialize scheduled tasks after database connection
     initializeScheduler();
+    
+    // Start payment verification job
+    startPaymentVerificationJob();
     
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);

@@ -7,7 +7,7 @@ import { BogPaymentService, BogCallbackData } from '../services/payments/BogPaym
 /**
  * Handle BOG payment details (direct format from BOG API)
  */
-async function handleBogPaymentDetails(paymentDetails: any, res: Response): Promise<void> {
+export async function handleBogPaymentDetails(paymentDetails: any, res: Response): Promise<void> {
   console.log('=== Processing BOG Payment Details ===');
   console.log('Payment Details:', JSON.stringify(paymentDetails, null, 2));
   
@@ -41,19 +41,19 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
     // Try multiple search strategies
     const searchStrategies = [];
     
-    // Strategy 1: Search by externalTransactionId matching bog_order_id (PRIMARY METHOD)
-    if (bogOrderId) {
-      searchStrategies.push({
-        name: 'bogOrderId',
-        where: { externalTransactionId: bogOrderId }
-      });
-    }
-    
-    // Strategy 2: Search by externalTransactionId matching external_order_id (for old transactions)
+    // Strategy 1: Search by externalTransactionId matching external_order_id (PRIMARY - our order ID)
     if (externalOrderId) {
       searchStrategies.push({
         name: 'externalOrderId',
         where: { externalTransactionId: externalOrderId }
+      });
+    }
+    
+    // Strategy 2: Search by externalTransactionId matching bog_order_id (fallback)
+    if (bogOrderId) {
+      searchStrategies.push({
+        name: 'bogOrderId',
+        where: { externalTransactionId: bogOrderId }
       });
     }
     
@@ -190,10 +190,12 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
       };
       
       if (orderStatus === 'completed') {
-        console.log('Processing completed payment...');
+        console.log('✅ Processing completed payment...');
         console.log('Transaction ID:', transaction.uuid);
         console.log('User ID:', transaction.userId);
         console.log('Transaction Amount:', transaction.amount);
+        console.log('Transaction Status:', transaction.status);
+        console.log('Payment Method:', transaction.paymentMethod);
         
         const user = await userRepo.findOne({
           where: { id: transaction.userId },
@@ -211,10 +213,10 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
         const topUpAmount = parseFloat(transaction.amount.toString());
         const newBalance = currentBalance + topUpAmount;
         
-        console.log(`Balance update for user ${user.id}:`);
-        console.log(`  Current balance: ${currentBalance}`);
-        console.log(`  Top-up amount: ${topUpAmount}`);
-        console.log(`  New balance: ${newBalance}`);
+        console.log(`💰 Balance update for user ${user.id}:`);
+        console.log(`  Current balance: ${currentBalance} GEL`);
+        console.log(`  Top-up amount: ${topUpAmount} GEL`);
+        console.log(`  New balance: ${newBalance} GEL`);
         
         // Update transaction
         transaction.status = TransactionStatusEnum.COMPLETED;
@@ -242,9 +244,14 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
         console.log('User balance updated successfully');
         
         await queryRunner.commitTransaction();
-        console.log('Database transaction committed successfully');
+        console.log('✅ Database transaction committed successfully');
         
-        console.log(`✅ BOG payment completed successfully for order ${externalOrderId}, user ${transaction.userId}, amount: ${topUpAmount}, new balance: ${newBalance}`);
+        console.log(`✅ BOG payment completed successfully:`);
+        console.log(`  - Order ID: ${externalOrderId}`);
+        console.log(`  - BOG Order ID: ${bogOrderId}`);
+        console.log(`  - User ID: ${transaction.userId}`);
+        console.log(`  - Amount: ${topUpAmount} GEL`);
+        console.log(`  - New Balance: ${newBalance} GEL`);
         
         res.status(200).json({
           status: 'success',
