@@ -261,9 +261,16 @@ router.post('/bog/test-return-from-payment/:userId', async (req: Request, res: R
   }
 });
 
-// Test endpoint to simulate BOG callback (no auth for testing)
+// Test endpoint to simulate BOG callback with proper status codes (no auth for testing)
 router.post('/bog/test-callback', async (req: Request, res: Response) => {
-  const { bogOrderId, externalOrderId, status = 'completed', amount } = req.body;
+  const { 
+    bogOrderId, 
+    externalOrderId, 
+    statusCode = 100, // Default to successful payment
+    statusKey = 'completed',
+    statusDescription = 'წარმატებული გადახდა', // Georgian for "Successful payment"
+    amount 
+  } = req.body;
   
   if (!bogOrderId && !externalOrderId) {
     return res.status(400).json({
@@ -291,14 +298,15 @@ router.post('/bog/test-callback', async (req: Request, res: Response) => {
     }
   }
   
-  // Simulate BOG callback format
+  // Simulate proper BOG callback format with status codes
   const testCallback = {
     body: {
       order_id: bogOrderId,
       external_order_id: externalOrderId,
       order_status: {
-        key: status,
-        value: status === 'completed' ? 'გადახდა წარმატებულია' : 'გადახდა ვერ განხორციელდა'
+        key: statusKey,
+        code: statusCode,
+        value: statusDescription
       },
       purchase_units: {
         transfer_amount: transferAmount,
@@ -314,9 +322,50 @@ router.post('/bog/test-callback', async (req: Request, res: Response) => {
     }
   };
   
+  console.log('🧪 Simulating BOG callback with:', {
+    bogOrderId,
+    externalOrderId,
+    statusCode,
+    statusKey,
+    statusDescription,
+    transferAmount
+  });
+  
   // Forward to actual BOG callback handler
-  req.body = testCallback;
+  req.body = testCallback.body;
   return handleBogCallback(req, res);
+});
+
+// Quick test endpoints for different BOG status codes
+router.post('/bog/test-success/:transactionId', async (req: Request, res: Response) => {
+  const { transactionId } = req.params;
+  
+  // Simulate successful payment callback (status code 100)
+  return res.redirect(307, `/api/balance/bog/test-callback?bogOrderId=${transactionId}&statusCode=100&statusKey=completed&statusDescription=წარმატებული გადახდა`);
+});
+
+router.post('/bog/test-failed/:transactionId', async (req: Request, res: Response) => {
+  const { transactionId } = req.params;
+  const { code = 107 } = req.body; // Default to insufficient funds
+  
+  const statusMessages = {
+    101: 'გადახდა უარყოფილია, რადგან ბარათის გამოყენება შეზღუდულია',
+    102: 'დამახსოვრებული ბარათი ვერ მოიძებნა', 
+    103: 'გადახდა უარყოფილია, რადგან ბარათი არ არის ვალიდური',
+    104: 'გადახდა უარყოფილია ტრანზაქციის რაოდენობის ლიმიტის გადაჭარბების გამო',
+    105: 'გადახდა უარყოფილია, რადგან ბარათი ვადაგასულია',
+    106: 'გადახდა უარყოფილია თანხის ლიმიტის გადაჭარბების გამო',
+    107: 'გადახდა უარყოფილია ანგარიშზე არასაკმარისი თანხის გამო',
+    108: 'გადახდის ავტორიზაციის უარყოფა',
+    109: 'დაფიქსირდა ტექნიკური ხარვეზი',
+    110: 'ოპერაციის შესრულების დრო ამოიწურა',
+    111: 'გადახდის ავტორიზაციის დრო ამოიწურა',
+    112: 'საერთო შეცდომა'
+  };
+  
+  const statusDescription = statusMessages[code] || 'უცნობი შეცდომა';
+  
+  return res.redirect(307, `/api/balance/bog/test-callback?bogOrderId=${transactionId}&statusCode=${code}&statusKey=rejected&statusDescription=${encodeURIComponent(statusDescription)}`);
 });
 
 // Admin endpoint to cleanup old invalid transactions (no auth for testing)
