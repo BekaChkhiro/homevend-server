@@ -314,8 +314,11 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           ? orderResult._links.redirect 
           : orderResult._links.redirect.href;
         
+        // IMPORTANT: Update externalTransactionId to BOG's order ID for webhook matching
+        transaction.externalTransactionId = bogOrderId;
         transaction.metadata = {
           ...transaction.metadata,
+          originalOrderId: orderId,  // Keep original order ID for reference
           bogOrderId: bogOrderId,
           bogRedirectUrl: redirectUrl
         };

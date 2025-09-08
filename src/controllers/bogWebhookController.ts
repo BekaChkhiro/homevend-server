@@ -41,19 +41,19 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
     // Try multiple search strategies
     const searchStrategies = [];
     
-    // Strategy 1: Search by externalTransactionId matching external_order_id
-    if (externalOrderId) {
-      searchStrategies.push({
-        name: 'externalOrderId',
-        where: { externalTransactionId: externalOrderId }
-      });
-    }
-    
-    // Strategy 2: Search by externalTransactionId matching bog_order_id
+    // Strategy 1: Search by externalTransactionId matching bog_order_id (PRIMARY METHOD)
     if (bogOrderId) {
       searchStrategies.push({
         name: 'bogOrderId',
         where: { externalTransactionId: bogOrderId }
+      });
+    }
+    
+    // Strategy 2: Search by externalTransactionId matching external_order_id (for old transactions)
+    if (externalOrderId) {
+      searchStrategies.push({
+        name: 'externalOrderId',
+        where: { externalTransactionId: externalOrderId }
       });
     }
     
@@ -70,6 +70,16 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
     // Strategy 4: Search in metadata for original orderId
     if (externalOrderId) {
       searchStrategies.push({
+        name: 'metadataOriginalOrderId',
+        metadata: true,
+        query: "transaction.metadata->>'originalOrderId' = :orderId",
+        params: { orderId: externalOrderId }
+      });
+    }
+    
+    // Strategy 5: Search in metadata for orderId (legacy)
+    if (externalOrderId) {
+      searchStrategies.push({
         name: 'metadataOrderId',
         metadata: true,
         query: "transaction.metadata->>'orderId' = :orderId",
@@ -77,7 +87,7 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
       });
     }
     
-    // Strategy 5: Try to match by user ID and amount if we have enough info
+    // Strategy 6: Try to match by user ID and amount if we have enough info
     if (paymentDetails.purchase_units?.transfer_amount) {
       const transferAmount = parseFloat(paymentDetails.purchase_units.transfer_amount);
       searchStrategies.push({
@@ -119,7 +129,26 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
     }
     
     if (!transaction) {
-      console.error('Transaction not found');
+      console.error('❌ Transaction not found with any search strategy');
+      console.error('Searched for:');
+      console.error('  - BOG Order ID:', bogOrderId);
+      console.error('  - External Order ID:', externalOrderId);
+      console.error('  - Transfer Amount:', paymentDetails.purchase_units?.transfer_amount);
+      
+      // Log all pending transactions for debugging
+      const pendingTransactions = await transactionRepository.find({
+        where: {
+          type: TransactionTypeEnum.TOP_UP,
+          status: TransactionStatusEnum.PENDING
+        },
+        select: ['uuid', 'externalTransactionId', 'metadata', 'amount', 'userId']
+      });
+      
+      console.error('Current pending TOP_UP transactions:');
+      pendingTransactions.forEach(tx => {
+        console.error(`  - UUID: ${tx.uuid}, ExtID: ${tx.externalTransactionId}, Amount: ${tx.amount}, Metadata:`, tx.metadata);
+      });
+      
       res.status(200).json({
         status: 'acknowledged',
         message: 'Transaction not found, callback logged',
@@ -162,6 +191,9 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
       
       if (orderStatus === 'completed') {
         console.log('Processing completed payment...');
+        console.log('Transaction ID:', transaction.uuid);
+        console.log('User ID:', transaction.userId);
+        console.log('Transaction Amount:', transaction.amount);
         
         const user = await userRepo.findOne({
           where: { id: transaction.userId },
@@ -179,7 +211,10 @@ async function handleBogPaymentDetails(paymentDetails: any, res: Response): Prom
         const topUpAmount = parseFloat(transaction.amount.toString());
         const newBalance = currentBalance + topUpAmount;
         
-        console.log(`Balance update: ${currentBalance} + ${topUpAmount} = ${newBalance}`);
+        console.log(`Balance update for user ${user.id}:`);
+        console.log(`  Current balance: ${currentBalance}`);
+        console.log(`  Top-up amount: ${topUpAmount}`);
+        console.log(`  New balance: ${newBalance}`);
         
         // Update transaction
         transaction.status = TransactionStatusEnum.COMPLETED;
