@@ -411,6 +411,11 @@ PwIDAQAB
         }
       );
 
+      console.log('📦 BOG Create Order Response:', JSON.stringify(response.data, null, 2));
+      console.log('  - Order ID field:', response.data.id);
+      console.log('  - Order ID field (legacy):', response.data.order_id);
+      console.log('  - External Order ID sent:', params.orderId);
+
       return response.data;
     } catch (error: any) {
       console.error('🚫 BOG Create Order Error Details:');
