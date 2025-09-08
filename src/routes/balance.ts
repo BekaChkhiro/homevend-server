@@ -298,14 +298,13 @@ router.post('/bog/test-callback', async (req: Request, res: Response) => {
     }
   }
   
-  // Simulate proper BOG callback format with status codes
+  // Simulate proper BOG callback format based on API docs
   const testCallback = {
     body: {
       order_id: bogOrderId,
       external_order_id: externalOrderId,
       order_status: {
         key: statusKey,
-        code: statusCode,
         value: statusDescription
       },
       purchase_units: {
@@ -313,6 +312,8 @@ router.post('/bog/test-callback', async (req: Request, res: Response) => {
         currency_code: 'GEL'
       },
       payment_detail: {
+        code: statusCode.toString(), // Status code is here according to BOG API docs
+        code_description: statusCode === 100 ? 'Successful payment' : 'Payment failed',
         transaction_id: `test_${Date.now()}`,
         transfer_method: {
           key: 'card',
@@ -366,6 +367,45 @@ router.post('/bog/test-failed/:transactionId', async (req: Request, res: Respons
   const statusDescription = statusMessages[code] || 'უცნობი შეცდომა';
   
   return res.redirect(307, `/api/balance/bog/test-callback?bogOrderId=${transactionId}&statusCode=${code}&statusKey=rejected&statusDescription=${encodeURIComponent(statusDescription)}`);
+});
+
+// Test endpoint with proper BOG API structure demonstration
+router.post('/bog/test-complete-callback/:transactionId', async (req: Request, res: Response) => {
+  const { transactionId } = req.params;
+  
+  // Simulate complete BOG callback structure according to API docs
+  const completeCallback = {
+    order_id: transactionId,
+    external_order_id: `external_${transactionId}`,
+    industry: "ecommerce",
+    capture: "automatic",
+    order_status: {
+      key: "completed",
+      value: "წარმატებული გადახდა"
+    },
+    purchase_units: {
+      transfer_amount: "50.00",
+      currency_code: "GEL"
+    },
+    payment_detail: {
+      code: "100",  // THIS IS THE KEY - status code 100 for success
+      code_description: "Successful payment",
+      transaction_id: `bog_${Date.now()}`,
+      transfer_method: {
+        key: "card", 
+        value: "ბარათით გადახდა"
+      },
+      card_type: "visa",
+      payer_identifier: "424242xxxxxx4242"
+    }
+  };
+  
+  console.log('🧪 Complete BOG callback test with proper API structure:');
+  console.log(JSON.stringify(completeCallback, null, 2));
+  
+  // Forward to actual BOG callback handler
+  req.body = completeCallback;
+  return handleBogCallback(req, res);
 });
 
 // Admin endpoint to cleanup old invalid transactions (no auth for testing)
