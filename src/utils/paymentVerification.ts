@@ -21,13 +21,34 @@ async function processTransaction(
   transaction: Transaction,
   bogService: BogPaymentService
 ): Promise<VerificationResult> {
-  const bogOrderId = transaction.metadata?.bogOrderId;
+  // Try to get BOG order ID from multiple sources
+  let bogOrderId = transaction.metadata?.bogOrderId;
+  
+  // For old transactions, BOG order ID might be in externalTransactionId
+  if (!bogOrderId && transaction.externalTransactionId && 
+      !transaction.externalTransactionId.startsWith('topup_')) {
+    bogOrderId = transaction.externalTransactionId;
+  }
+  
+  console.log(`🔍 Processing transaction ${transaction.uuid}:`);
+  console.log(`  - External Transaction ID: ${transaction.externalTransactionId}`);
+  console.log(`  - BOG Order ID from metadata: ${transaction.metadata?.bogOrderId}`);
+  console.log(`  - Final BOG Order ID to use: ${bogOrderId}`);
   
   if (!bogOrderId) {
     return {
       transactionId: transaction.uuid,
       status: 'error',
-      message: 'No BOG order ID found'
+      message: 'No BOG order ID found in transaction metadata or externalTransactionId'
+    };
+  }
+  
+  // Check if BOG order ID looks valid (not our internal ID format)
+  if (bogOrderId.startsWith('topup_')) {
+    return {
+      transactionId: transaction.uuid,
+      status: 'error',
+      message: 'BOG order ID appears to be internal order ID format - transaction may be corrupted'
     };
   }
   
@@ -203,10 +224,73 @@ async function handlePendingPayment(
 }
 
 /**
+ * Clean up old invalid BOG transactions that cannot be verified
+ */
+async function cleanupOldInvalidTransactions(): Promise<void> {
+  try {
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    // Find BOG transactions older than 24 hours that are still pending
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    const oldTransactions = await transactionRepository.find({
+      where: {
+        type: TransactionTypeEnum.TOP_UP,
+        status: TransactionStatusEnum.PENDING,
+        paymentMethod: 'bog',
+        createdAt: LessThan(oneDayAgo)
+      }
+    });
+    
+    if (oldTransactions.length === 0) {
+      return;
+    }
+    
+    console.log(`🧹 Found ${oldTransactions.length} old pending BOG transactions to clean up`);
+    
+    for (const transaction of oldTransactions) {
+      // Check if transaction has valid BOG order ID
+      const bogOrderId = transaction.metadata?.bogOrderId || 
+        (!transaction.externalTransactionId?.startsWith('topup_') ? transaction.externalTransactionId : null);
+      
+      if (!bogOrderId || bogOrderId.startsWith('topup_')) {
+        // Mark as failed - no valid BOG order ID
+        transaction.status = TransactionStatusEnum.FAILED;
+        transaction.metadata = {
+          ...transaction.metadata,
+          cleanupReason: 'No valid BOG order ID found',
+          cleanedUpAt: new Date().toISOString()
+        };
+        
+        await transactionRepository.save(transaction);
+        console.log(`❌ Marked transaction ${transaction.uuid} as failed (no valid BOG order ID)`);
+      } else {
+        // Mark as failed after 24 hours - likely abandoned
+        transaction.status = TransactionStatusEnum.FAILED;
+        transaction.metadata = {
+          ...transaction.metadata,
+          cleanupReason: 'Payment abandoned after 24 hours',
+          cleanedUpAt: new Date().toISOString(),
+          bogOrderId: bogOrderId
+        };
+        
+        await transactionRepository.save(transaction);
+        console.log(`⏱️ Marked transaction ${transaction.uuid} as failed (abandoned after 24 hours)`);
+      }
+    }
+  } catch (error) {
+    console.error('Error during transaction cleanup:', error);
+  }
+}
+
+/**
  * Verify all pending BOG payments
  */
 export async function verifyPendingBogPayments(): Promise<VerificationResult[]> {
   console.log('🔄 Starting BOG payments verification...');
+  
+  // First, clean up old invalid transactions
+  await cleanupOldInvalidTransactions();
   
   const results: VerificationResult[] = [];
   
