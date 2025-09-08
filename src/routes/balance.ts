@@ -17,7 +17,7 @@ import { Transaction, TransactionStatusEnum, TransactionTypeEnum } from '../mode
 import { User } from '../models/User.js';
 import { BogPaymentService } from '../services/payments/BogPaymentService.js';
 import { verifySinglePayment, paymentVerificationScheduler, verifyUserPendingPayments } from '../utils/paymentVerification.js';
-import { LessThan } from 'typeorm';
+import { LessThan, MoreThan } from 'typeorm';
 
 const router = Router();
 
@@ -85,6 +85,74 @@ router.post('/bog/test-verify-user/:userId', async (req: Request, res: Response)
     
   } catch (error: any) {
     console.error('Test verification error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Test endpoint for simulating user return from BOG payment (no auth for testing)
+router.post('/bog/test-return-from-payment/:userId', async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    if (!userId) {
+      return res.status(400).json({
+        error: 'Invalid user ID'
+      });
+    }
+    
+    console.log(`🧪 Testing return-from-payment verification for user ${userId}`);
+    
+    // Simulate what would happen when user returns from BOG payment
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    
+    const recentPendingTransactions = await transactionRepository.find({
+      where: {
+        userId: userId,
+        type: TransactionTypeEnum.TOP_UP,
+        status: TransactionStatusEnum.PENDING,
+        paymentMethod: 'bog',
+        createdAt: MoreThan(tenMinutesAgo)
+      },
+      order: { createdAt: 'DESC' }
+    });
+    
+    console.log(`📋 Found ${recentPendingTransactions.length} recent pending BOG transactions for user ${userId}`);
+    
+    if (recentPendingTransactions.length === 0) {
+      return res.json({
+        success: true,
+        message: `No recent pending BOG transactions found for user ${userId}`,
+        foundTransactions: 0
+      });
+    }
+    
+    // Trigger verification
+    const results = await verifyUserPendingPayments(userId);
+    
+    return res.json({
+      success: true,
+      message: `Simulated return from payment for user ${userId}`,
+      foundTransactions: recentPendingTransactions.length,
+      verificationResults: {
+        total: results.length,
+        completed: results.filter(r => r.status === 'completed').length,
+        failed: results.filter(r => r.status === 'failed').length,
+        pending: results.filter(r => r.status === 'pending').length,
+        errors: results.filter(r => r.status === 'error').length
+      },
+      results: results.map(r => ({
+        transactionId: r.transactionId,
+        status: r.status,
+        message: r.message
+      }))
+    });
+    
+  } catch (error: any) {
+    console.error('Test return from payment error:', error);
     return res.status(500).json({
       success: false,
       error: error.message
@@ -296,6 +364,117 @@ router.post('/bog/verify-all', authenticate, async (req: Request, res: Response)
 
 // All other balance routes require authentication
 router.use(authenticate);
+
+// Endpoint to call when user returns from BOG payment (immediate verification)
+router.post('/check-recent-payments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    
+    console.log(`🔍 User ${userId} returned from payment - checking recent transactions`);
+    
+    // First get any recent pending transactions for this user (last 10 minutes)
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    
+    const recentPendingTransactions = await transactionRepository.find({
+      where: {
+        userId: userId,
+        type: TransactionTypeEnum.TOP_UP,
+        status: TransactionStatusEnum.PENDING,
+        paymentMethod: 'bog',
+        createdAt: MoreThan(tenMinutesAgo)
+      },
+      order: { createdAt: 'DESC' }
+    });
+    
+    console.log(`📋 Found ${recentPendingTransactions.length} recent pending BOG transactions for user ${userId}`);
+    
+    if (recentPendingTransactions.length === 0) {
+      // Get current balance anyway
+      const userRepository = AppDataSource.getRepository(User);
+      const currentUser = await userRepository.findOne({
+        where: { id: userId },
+        select: ['id', 'balance']
+      });
+      
+      res.json({
+        success: true,
+        message: 'No recent pending transactions found',
+        currentBalance: currentUser ? parseFloat(currentUser.balance.toString()) : 0,
+        verification: {
+          total: 0,
+          completed: 0,
+          failed: 0,
+          pending: 0,
+          errors: 0
+        },
+        recentTransactions: []
+      });
+      return;
+    }
+    
+    // Trigger immediate verification for this user
+    console.log(`🚀 Triggering verification for ${recentPendingTransactions.length} recent transactions`);
+    const results = await verifyUserPendingPayments(userId);
+    
+    // Check if any payments were completed
+    const completed = results.filter(r => r.status === 'completed');
+    const failed = results.filter(r => r.status === 'failed');
+    const pending = results.filter(r => r.status === 'pending');
+    const errors = results.filter(r => r.status === 'error');
+    
+    // Get updated user balance
+    const userRepository = AppDataSource.getRepository(User);
+    const updatedUser = await userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'balance']
+    });
+    
+    const response = {
+      success: true,
+      message: `Verified ${results.length} recent transactions`,
+      currentBalance: updatedUser?.balance ? parseFloat(updatedUser.balance.toString()) : 0,
+      verification: {
+        total: results.length,
+        completed: completed.length,
+        failed: failed.length,
+        pending: pending.length,
+        errors: errors.length
+      },
+      results: results.map(r => ({
+        transactionId: r.transactionId,
+        status: r.status,
+        message: r.message,
+        balanceUpdate: r.balanceUpdate
+      })),
+      // Indicate if user should refresh their balance
+      balanceUpdated: completed.length > 0,
+      // Include recent transaction info
+      recentTransactions: recentPendingTransactions.map(tx => ({
+        id: tx.uuid,
+        amount: parseFloat(tx.amount.toString()),
+        createdAt: tx.createdAt.toISOString(),
+        status: tx.status
+      }))
+    };
+    
+    if (completed.length > 0) {
+      console.log(`✅ User ${userId} returned from payment: ${completed.length} payments completed, balance updated`);
+    } else {
+      console.log(`⏳ User ${userId} returned from payment: no payments completed yet`);
+    }
+    
+    res.json(response);
+    
+  } catch (error: any) {
+    console.error('Recent payment check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify recent payments',
+      error: error.message
+    });
+  }
+});
 
 // Immediate payment verification for current user
 router.post('/verify-payments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
