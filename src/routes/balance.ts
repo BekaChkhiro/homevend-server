@@ -24,13 +24,40 @@ const router = Router();
 // Webhook endpoints (no authentication required)
 router.post('/flitt/callback', handleFlittCallback);
 
-// Enhanced BOG callback with additional logging
+// Enhanced BOG callback with comprehensive debugging
 router.post('/bog/callback', (req: Request, res: Response, next: any) => {
   const timestamp = new Date().toISOString();
-  console.log(`🚀 [${timestamp}] BOG WEBHOOK RECEIVED:`);
-  console.log('📨 Body:', JSON.stringify(req.body, null, 2));
-  console.log('🌍 IP:', req.ip);
-  console.log('🔗 Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
+  console.log(`🚀 [${timestamp}] BOG WEBHOOK RECEIVED!!!`);
+  console.log('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
+  console.log('📨 RAW BODY:', JSON.stringify(req.body, null, 2));
+  console.log('🌍 CLIENT IP:', req.ip);
+  console.log('🌍 X-FORWARDED-FOR:', req.headers['x-forwarded-for']);
+  console.log('🔗 ALL HEADERS:', JSON.stringify(req.headers, null, 2));
+  console.log('🔧 METHOD:', req.method);
+  console.log('🔧 URL:', req.url);
+  console.log('🔧 QUERY PARAMS:', JSON.stringify(req.query, null, 2));
+  
+  // Detailed structure analysis
+  if (req.body) {
+    console.log('🔍 STRUCTURE ANALYSIS:');
+    console.log('  - order_id:', req.body.order_id);
+    console.log('  - external_order_id:', req.body.external_order_id);
+    console.log('  - order_status:', JSON.stringify(req.body.order_status, null, 2));
+    console.log('  - payment_detail:', JSON.stringify(req.body.payment_detail, null, 2));
+    console.log('  - purchase_units:', JSON.stringify(req.body.purchase_units, null, 2));
+    
+    // Check for status codes in different locations
+    console.log('🔍 STATUS CODE LOCATIONS:');
+    console.log('  - order_status?.key:', req.body.order_status?.key);
+    console.log('  - order_status?.code:', req.body.order_status?.code);
+    console.log('  - order_status?.value:', req.body.order_status?.value);
+    console.log('  - payment_detail?.code:', req.body.payment_detail?.code);
+    console.log('  - payment_detail?.code_description:', req.body.payment_detail?.code_description);
+    console.log('  - status_code (root):', req.body.status_code);
+    console.log('  - code (root):', req.body.code);
+  }
+  
   console.log('===============================================');
   
   // Continue to actual handler
@@ -406,6 +433,281 @@ router.post('/bog/test-complete-callback/:transactionId', async (req: Request, r
   // Forward to actual BOG callback handler
   req.body = completeCallback;
   return handleBogCallback(req, res);
+});
+
+// Raw BOG callback test - shows exactly what callback structure produces
+router.post('/bog/raw-callback-test', async (req: Request, res: Response) => {
+  console.log('🧪 RAW BOG CALLBACK TEST');
+  console.log('📨 Received body:', JSON.stringify(req.body, null, 2));
+  
+  // Try processing with the actual webhook handler
+  try {
+    console.log('🔄 Processing with actual webhook handler...');
+    const result = await handleBogPaymentDetails(req.body, res);
+    console.log('✅ Webhook processing completed');
+    return result;
+  } catch (error) {
+    console.error('❌ Webhook processing failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      receivedBody: req.body
+    });
+  }
+});
+
+// FORCE SUCCESS - Test endpoint to manually complete a transaction (for debugging)
+router.post('/bog/force-success/:transactionId', async (req: Request, res: Response) => {
+  try {
+    const { transactionId } = req.params;
+    
+    console.log(`🔧 FORCE SUCCESS for transaction: ${transactionId}`);
+    
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    const userRepository = AppDataSource.getRepository(User);
+    
+    // Find transaction
+    const transaction = await transactionRepository.findOne({
+      where: [
+        { uuid: transactionId },
+        { externalTransactionId: transactionId }
+      ],
+      relations: ['user']
+    });
+    
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
+      });
+    }
+    
+    if (transaction.status === TransactionStatusEnum.COMPLETED) {
+      return res.json({
+        success: true,
+        message: 'Transaction already completed',
+        transaction: {
+          id: transaction.uuid,
+          status: transaction.status,
+          amount: parseFloat(transaction.amount.toString()),
+          balanceAfter: transaction.balanceAfter ? parseFloat(transaction.balanceAfter.toString()) : null
+        }
+      });
+    }
+    
+    if (transaction.status !== TransactionStatusEnum.PENDING) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot complete transaction with status: ${transaction.status}`
+      });
+    }
+    
+    // Force complete the transaction
+    const user = await userRepository.findOne({
+      where: { id: transaction.userId },
+      select: ['id', 'balance']
+    });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    const currentBalance = parseFloat(user.balance.toString());
+    const topUpAmount = parseFloat(transaction.amount.toString());
+    const newBalance = currentBalance + topUpAmount;
+    
+    console.log(`💰 FORCE SUCCESS - Balance update for user ${user.id}:`);
+    console.log(`  Current balance: ${currentBalance} GEL`);
+    console.log(`  Top-up amount: ${topUpAmount} GEL`);
+    console.log(`  New balance: ${newBalance} GEL`);
+    
+    // Update transaction
+    transaction.status = TransactionStatusEnum.COMPLETED;
+    transaction.balanceAfter = newBalance;
+    transaction.metadata = {
+      ...transaction.metadata,
+      completedAt: new Date().toISOString(),
+      bogPaymentStatus: 'force_completed',
+      paymentStatusCode: '100',
+      paymentCodeDescription: 'Manually forced to success',
+      forceCompletedAt: new Date().toISOString()
+    };
+    
+    await transactionRepository.save(transaction);
+    
+    // Update user balance
+    user.balance = newBalance;
+    await userRepository.save(user);
+    
+    console.log(`✅ FORCE SUCCESS completed for transaction ${transactionId}`);
+    
+    return res.json({
+      success: true,
+      message: 'Transaction force completed successfully',
+      transaction: {
+        id: transaction.uuid,
+        status: transaction.status,
+        amount: topUpAmount,
+        balanceAfter: newBalance,
+        oldBalance: currentBalance,
+        newBalance: newBalance
+      },
+      user: {
+        id: user.id,
+        oldBalance: currentBalance,
+        newBalance: newBalance
+      }
+    });
+    
+  } catch (error: any) {
+    console.error('Force success error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Manual BOG verification using BOG API (no auth for testing)
+router.post('/bog/verify-by-api/:transactionId', async (req: Request, res: Response) => {
+  try {
+    const { transactionId } = req.params;
+    
+    console.log(`🔍 Manual BOG API verification for transaction: ${transactionId}`);
+    
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    // Find transaction
+    const transaction = await transactionRepository.findOne({
+      where: [
+        { uuid: transactionId },
+        { externalTransactionId: transactionId }
+      ],
+      relations: ['user']
+    });
+    
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
+      });
+    }
+    
+    // Get BOG order ID
+    const bogOrderId = transaction.metadata?.bogOrderId || 
+      (!transaction.externalTransactionId?.startsWith('topup_') ? transaction.externalTransactionId : null);
+    
+    if (!bogOrderId || bogOrderId.startsWith('topup_')) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid BOG order ID found for this transaction',
+        transactionData: {
+          uuid: transaction.uuid,
+          externalTransactionId: transaction.externalTransactionId,
+          metadata: transaction.metadata
+        }
+      });
+    }
+    
+    console.log(`🔄 Checking BOG API for order: ${bogOrderId}`);
+    
+    const { BogPaymentService } = await import('../services/payments/BogPaymentService.js');
+    const bogService = new BogPaymentService();
+    
+    try {
+      const paymentDetails = await bogService.getPaymentDetails(bogOrderId);
+      
+      console.log(`📊 BOG API Response:`, {
+        order_id: paymentDetails.order_id,
+        order_status: paymentDetails.order_status,
+        payment_detail: paymentDetails.payment_detail ? {
+          code: paymentDetails.payment_detail.code,
+          code_description: paymentDetails.payment_detail.code_description
+        } : null,
+        purchase_units: {
+          transfer_amount: paymentDetails.purchase_units?.transfer_amount
+        }
+      });
+      
+      // Check if payment is completed according to BOG API docs
+      const isCompleted = paymentDetails.order_status.key === 'completed' && 
+                         paymentDetails.payment_detail?.code === '100';
+      
+      if (isCompleted) {
+        console.log(`✅ Payment verified as completed! Processing via webhook handler...`);
+        
+        // Process via webhook handler
+        const callbackData = {
+          order_id: bogOrderId,
+          external_order_id: transaction.metadata?.originalOrderId || transaction.uuid,
+          order_status: paymentDetails.order_status,
+          payment_detail: paymentDetails.payment_detail,
+          purchase_units: paymentDetails.purchase_units
+        };
+        
+        const { handleBogPaymentDetails } = await import('../controllers/bogWebhookController.js');
+        const mockRes = {
+          status: () => ({ json: (data: any) => console.log('Webhook response:', data), send: () => {} }),
+          json: (data: any) => console.log('Webhook response:', data),
+          send: () => {}
+        } as any;
+        
+        await handleBogPaymentDetails(callbackData, mockRes);
+        
+        // Get updated transaction
+        const updatedTransaction = await transactionRepository.findOne({
+          where: { uuid: transaction.uuid },
+          relations: ['user']
+        });
+        
+        return res.json({
+          success: true,
+          message: 'Payment verified and processed successfully',
+          bogOrderId: bogOrderId,
+          bogResponse: paymentDetails,
+          transaction: {
+            id: updatedTransaction?.uuid,
+            status: updatedTransaction?.status,
+            amount: updatedTransaction ? parseFloat(updatedTransaction.amount.toString()) : null,
+            balanceAfter: updatedTransaction?.balanceAfter ? parseFloat(updatedTransaction.balanceAfter.toString()) : null
+          },
+          userBalance: updatedTransaction?.user ? parseFloat(updatedTransaction.user.balance.toString()) : null
+        });
+        
+      } else {
+        return res.json({
+          success: false,
+          message: 'Payment not yet completed',
+          bogOrderId: bogOrderId,
+          currentStatus: {
+            order_status: paymentDetails.order_status,
+            payment_code: paymentDetails.payment_detail?.code,
+            payment_description: paymentDetails.payment_detail?.code_description
+          },
+          isCompleted: false
+        });
+      }
+      
+    } catch (bogError: any) {
+      console.error(`❌ BOG API Error:`, bogError.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to verify payment with BOG API',
+        bogError: bogError.message,
+        bogOrderId: bogOrderId
+      });
+    }
+    
+  } catch (error: any) {
+    console.error('Manual verification error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // Admin endpoint to cleanup old invalid transactions (no auth for testing)

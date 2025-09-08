@@ -330,15 +330,76 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
         console.log('  - Original Order ID (our ID):', orderId);
         console.log('  - Transaction UUID:', transaction.uuid);
         
-        // NOTE: Don't trigger immediate verification here - user hasn't completed payment yet!
-        // Verification should be triggered when:
-        // 1. BOG webhook callback is received (automatic)
-        // 2. User returns to success page (frontend should call /verify-payments)
-        // 3. User manually clicks refresh/check status
-        console.log(`📝 BOG payment initiated for user ${userId}. Verification will be triggered by:`);
-        console.log(`   1. BOG webhook callback (automatic)`);
-        console.log(`   2. Frontend polling when user returns from payment`);
-        console.log(`   3. Scheduled backup verification in 2 minutes`);
+        // Start IMMEDIATE verification polling since BOG webhooks might not work
+        console.log(`🚀 BOG payment initiated for user ${userId}. Starting immediate verification polling...`);
+        console.log(`   BOG Order ID: ${bogOrderId}`);
+        console.log(`   Transaction UUID: ${transaction.uuid}`);
+        
+        // Start aggressive polling immediately - check every 10 seconds for 2 minutes
+        let verificationAttempts = 0;
+        const maxAttempts = 12; // 12 attempts x 10 seconds = 2 minutes
+        
+        const pollPaymentStatus = async () => {
+          verificationAttempts++;
+          console.log(`🔄 Verification attempt ${verificationAttempts}/${maxAttempts} for BOG order ${bogOrderId}`);
+          
+          try {
+            const bogService = new BogPaymentService();
+            const paymentDetails = await bogService.getPaymentDetails(bogOrderId);
+            
+            console.log(`📊 BOG API Response for ${bogOrderId}:`, {
+              order_status: paymentDetails.order_status,
+              payment_detail_code: paymentDetails.payment_detail?.code,
+              payment_detail_description: paymentDetails.payment_detail?.code_description
+            });
+            
+            // Check if payment completed successfully
+            const isCompleted = paymentDetails.order_status.key === 'completed' && 
+                               paymentDetails.payment_detail?.code === '100';
+            
+            if (isCompleted) {
+              console.log(`✅ Payment completed! Processing balance update for transaction ${transaction.uuid}`);
+              
+              // Trigger manual completion via our webhook handler
+              const callbackData = {
+                order_id: bogOrderId,
+                external_order_id: orderId,
+                order_status: paymentDetails.order_status,
+                payment_detail: paymentDetails.payment_detail,
+                purchase_units: paymentDetails.purchase_units
+              };
+              
+              // Process the payment directly (simulate webhook)
+              const { handleBogPaymentDetails } = await import('../controllers/bogWebhookController.js');
+              const mockRes = {
+                status: () => ({ json: () => {}, send: () => {} }),
+                json: () => {},
+                send: () => {}
+              } as any;
+              
+              await handleBogPaymentDetails(callbackData, mockRes);
+              return; // Stop polling
+            }
+            
+            // Continue polling if not completed yet
+            if (verificationAttempts < maxAttempts) {
+              setTimeout(pollPaymentStatus, 10000); // Check again in 10 seconds
+            } else {
+              console.log(`⏰ Verification timeout for BOG order ${bogOrderId} after ${maxAttempts} attempts`);
+            }
+            
+          } catch (error) {
+            console.error(`❌ Verification error for BOG order ${bogOrderId}:`, error.message);
+            
+            // Continue polling even on error
+            if (verificationAttempts < maxAttempts) {
+              setTimeout(pollPaymentStatus, 10000); // Check again in 10 seconds
+            }
+          }
+        };
+        
+        // Start polling after 30 seconds (give user time to complete payment)
+        setTimeout(pollPaymentStatus, 30000);
 
         // Also schedule a delayed check as backup
         setTimeout(async () => {

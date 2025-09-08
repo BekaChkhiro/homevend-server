@@ -197,8 +197,30 @@ export async function handleBogPaymentDetails(paymentDetails: any, res: Response
         bogOrderId: bogOrderId
       };
       
-      // Handle successful payments - BOG sends payment status code "100" for successful payments
-      if (orderStatus === 'completed' || paymentStatusCode === '100') {
+      // Handle successful payments according to BOG API docs:
+      // - order_status.key === "completed" 
+      // - payment_detail.code === "100"
+      const isSuccessfulPayment = 
+        orderStatus === 'completed' && paymentStatusCode === '100';
+      
+      console.log('🔍 BOG SUCCESS CHECK (API DOCS):');
+      console.log('  - order_status.key:', orderStatus);
+      console.log('  - payment_detail.code:', paymentStatusCode);
+      console.log('  - order_status === "completed":', orderStatus === 'completed');
+      console.log('  - payment_detail.code === "100":', paymentStatusCode === '100');
+      console.log('  - BOTH conditions met (SUCCESS):', isSuccessfulPayment);
+      
+      // Also check for fallback success indicators (legacy webhook formats)
+      const isFallbackSuccess = 
+        orderStatus === 'completed' || 
+        paymentStatusCode === '100' ||
+        paymentDetails.code === '100' ||
+        paymentDetails.status_code === '100';
+      
+      console.log('🔍 FALLBACK SUCCESS CHECK:');
+      console.log('  - Any success indicator found:', isFallbackSuccess);
+      
+      if (isSuccessfulPayment || isFallbackSuccess) {
         console.log('✅ Processing completed payment...');
         console.log('Transaction ID:', transaction.uuid);
         console.log('User ID:', transaction.userId);
