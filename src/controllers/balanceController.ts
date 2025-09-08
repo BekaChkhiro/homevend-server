@@ -373,6 +373,8 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
             paymentStatusUrl: `/api/balance/payment-status/${transaction.uuid}`,
             // NEW: Endpoint to call when user returns from BOG payment
             returnVerificationUrl: '/api/balance/check-recent-payments',
+            // AGGRESSIVE: Endpoint for persistent verification
+            aggressiveVerificationUrl: `/api/balance/verify-payment-aggressive/${transaction.uuid}`,
             // Instructions for frontend polling
             polling: {
               // Call returnVerificationUrl immediately when user returns from payment

@@ -23,7 +23,19 @@ const router = Router();
 
 // Webhook endpoints (no authentication required)
 router.post('/flitt/callback', handleFlittCallback);
-router.post('/bog/callback', handleBogCallback);
+
+// Enhanced BOG callback with additional logging
+router.post('/bog/callback', (req: Request, res: Response, next: any) => {
+  const timestamp = new Date().toISOString();
+  console.log(`🚀 [${timestamp}] BOG WEBHOOK RECEIVED:`);
+  console.log('📨 Body:', JSON.stringify(req.body, null, 2));
+  console.log('🌍 IP:', req.ip);
+  console.log('🔗 Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('===============================================');
+  
+  // Continue to actual handler
+  handleBogCallback(req, res);
+});
 
 // Debug endpoint to check pending BOG transactions (no auth for testing - temporarily)
 router.get('/bog/debug/pending', async (req: Request, res: Response) => {
@@ -89,6 +101,95 @@ router.post('/bog/test-verify-user/:userId', async (req: Request, res: Response)
       success: false,
       error: error.message
     });
+  }
+});
+
+// Debug endpoint to check what's happening with a specific transaction
+router.get('/bog/debug/transaction/:transactionId', async (req: Request, res: Response) => {
+  try {
+    const { transactionId } = req.params;
+    
+    console.log(`🔍 DEBUGGING transaction ${transactionId}`);
+    
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    // Find transaction by UUID or external ID
+    const transaction = await transactionRepository.findOne({
+      where: [
+        { uuid: transactionId },
+        { externalTransactionId: transactionId }
+      ],
+      relations: ['user']
+    });
+    
+    if (!transaction) {
+      res.status(404).json({
+        error: 'Transaction not found'
+      });
+      return;
+    }
+    
+    console.log(`📋 Transaction found:`, {
+      uuid: transaction.uuid,
+      externalTransactionId: transaction.externalTransactionId,
+      status: transaction.status,
+      amount: transaction.amount,
+      userId: transaction.userId,
+      paymentMethod: transaction.paymentMethod,
+      metadata: transaction.metadata
+    });
+    
+    // Try to get BOG order ID
+    const bogOrderId = transaction.metadata?.bogOrderId || 
+      (!transaction.externalTransactionId?.startsWith('topup_') ? transaction.externalTransactionId : null);
+    
+    let bogStatus = null;
+    let bogError = null;
+    
+    if (bogOrderId && !bogOrderId.startsWith('topup_')) {
+      try {
+        console.log(`🔄 Checking BOG status for order ID: ${bogOrderId}`);
+        const bogService = new BogPaymentService();
+        const paymentDetails = await bogService.getPaymentDetails(bogOrderId);
+        bogStatus = paymentDetails;
+        console.log(`📊 BOG response:`, paymentDetails);
+      } catch (error: any) {
+        bogError = error.message;
+        console.error(`❌ BOG API error:`, error.message);
+      }
+    }
+    
+    res.json({
+      success: true,
+      transaction: {
+        uuid: transaction.uuid,
+        externalTransactionId: transaction.externalTransactionId,
+        status: transaction.status,
+        amount: parseFloat(transaction.amount.toString()),
+        userId: transaction.userId,
+        paymentMethod: transaction.paymentMethod,
+        createdAt: transaction.createdAt,
+        metadata: transaction.metadata,
+        user: transaction.user ? {
+          id: transaction.user.id,
+          fullName: transaction.user.fullName,
+          balance: parseFloat(transaction.user.balance.toString())
+        } : null
+      },
+      bogOrderId: bogOrderId,
+      bogStatus: bogStatus,
+      bogError: bogError,
+      canVerify: !!bogOrderId && !bogOrderId.startsWith('topup_')
+    });
+    return;
+    
+  } catch (error: any) {
+    console.error('Debug transaction error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+    return;
   }
 });
 
@@ -364,6 +465,133 @@ router.post('/bog/verify-all', authenticate, async (req: Request, res: Response)
 
 // All other balance routes require authentication
 router.use(authenticate);
+
+// Aggressive verification endpoint - keeps checking until payment is found or timeout
+router.post('/verify-payment-aggressive/:transactionId', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { transactionId } = req.params;
+    const maxAttempts = 30; // 30 attempts
+    const intervalMs = 2000; // 2 seconds between attempts
+    
+    console.log(`🔥 AGGRESSIVE VERIFICATION started for transaction ${transactionId}, user ${userId}`);
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`🔄 Attempt ${attempt}/${maxAttempts} - Verifying transaction ${transactionId}`);
+      
+      // Check current transaction status first
+      const transactionRepository = AppDataSource.getRepository(Transaction);
+      const currentTransaction = await transactionRepository.findOne({
+        where: [
+          { uuid: transactionId, userId: userId },
+          { externalTransactionId: transactionId, userId: userId }
+        ]
+      });
+      
+      if (!currentTransaction) {
+        res.status(404).json({
+          success: false,
+          message: 'Transaction not found'
+        });
+        return;
+      }
+      
+      // If already completed, return success immediately
+      if (currentTransaction.status === TransactionStatusEnum.COMPLETED) {
+        const userRepository = AppDataSource.getRepository(User);
+        const currentUser = await userRepository.findOne({
+          where: { id: userId },
+          select: ['id', 'balance']
+        });
+        
+        console.log(`✅ Transaction ${transactionId} already completed on attempt ${attempt}`);
+        res.json({
+          success: true,
+          message: `Payment verified successfully on attempt ${attempt}`,
+          currentBalance: currentUser ? parseFloat(currentUser.balance.toString()) : 0,
+          transaction: {
+            id: currentTransaction.uuid,
+            status: currentTransaction.status,
+            amount: parseFloat(currentTransaction.amount.toString()),
+            balanceAfter: currentTransaction.balanceAfter ? parseFloat(currentTransaction.balanceAfter.toString()) : null
+          },
+          attempts: attempt,
+          verified: true
+        });
+        return;
+      }
+      
+      // If still pending, run verification
+      if (currentTransaction.status === TransactionStatusEnum.PENDING) {
+        console.log(`⏳ Transaction still pending, running verification...`);
+        const results = await verifyUserPendingPayments(userId);
+        
+        // Check if this specific transaction was completed
+        const thisTransactionResult = results.find(r => 
+          r.transactionId === transactionId || 
+          r.transactionId === currentTransaction.uuid
+        );
+        
+        if (thisTransactionResult && thisTransactionResult.status === 'completed') {
+          const userRepository = AppDataSource.getRepository(User);
+          const updatedUser = await userRepository.findOne({
+            where: { id: userId },
+            select: ['id', 'balance']
+          });
+          
+          console.log(`✅ Transaction ${transactionId} completed via verification on attempt ${attempt}`);
+          res.json({
+            success: true,
+            message: `Payment verified and completed on attempt ${attempt}`,
+            currentBalance: updatedUser ? parseFloat(updatedUser.balance.toString()) : 0,
+            transaction: {
+              id: currentTransaction.uuid,
+              status: 'completed',
+              amount: parseFloat(currentTransaction.amount.toString())
+            },
+            attempts: attempt,
+            verified: true,
+            balanceUpdate: thisTransactionResult.balanceUpdate
+          });
+          return;
+        }
+      }
+      
+      // If this isn't the last attempt, wait before trying again
+      if (attempt < maxAttempts) {
+        console.log(`⏱️ Waiting ${intervalMs}ms before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+      }
+    }
+    
+    // If we get here, all attempts failed
+    console.log(`❌ Aggressive verification failed after ${maxAttempts} attempts for transaction ${transactionId}`);
+    
+    const userRepository = AppDataSource.getRepository(User);
+    const currentUser = await userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'balance']
+    });
+    
+    res.json({
+      success: false,
+      message: `Payment verification timeout after ${maxAttempts} attempts. Please try again or contact support.`,
+      currentBalance: currentUser ? parseFloat(currentUser.balance.toString()) : 0,
+      attempts: maxAttempts,
+      verified: false,
+      timeout: true
+    });
+    return;
+    
+  } catch (error: any) {
+    console.error('Aggressive verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify payment',
+      error: error.message
+    });
+  }
+});
 
 // Endpoint to call when user returns from BOG payment (immediate verification)
 router.post('/check-recent-payments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
