@@ -658,6 +658,13 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     
     console.log('🔍 getProperties called with filters:', req.query);
     
+    // Parse comma-separated arrays from query parameters
+    const parsedPropertyType = propertyType 
+      ? (typeof propertyType === 'string' && propertyType.includes(',')
+          ? propertyType.split(',').map(t => t.trim()).filter(Boolean)
+          : propertyType)
+      : propertyType;
+    
     const propertyRepository = AppDataSource.getRepository(Property);
     const cityRepository = AppDataSource.getRepository(City);
 
@@ -773,10 +780,10 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     }
     
     // Property type filters
-    if (propertyType && Array.isArray(propertyType) && propertyType.length > 0) {
-      queryBuilder.andWhere('property.propertyType IN (:...propertyTypes)', { propertyTypes: propertyType });
-    } else if (propertyType && typeof propertyType === 'string' && propertyType !== 'all') {
-      queryBuilder.andWhere('property.propertyType = :propertyType', { propertyType });
+    if (parsedPropertyType && Array.isArray(parsedPropertyType) && parsedPropertyType.length > 0) {
+      queryBuilder.andWhere('property.propertyType IN (:...propertyTypes)', { propertyTypes: parsedPropertyType });
+    } else if (parsedPropertyType && typeof parsedPropertyType === 'string' && parsedPropertyType !== 'all') {
+      queryBuilder.andWhere('property.propertyType = :propertyType', { propertyType: parsedPropertyType });
     }
 
     // Deal type filter
