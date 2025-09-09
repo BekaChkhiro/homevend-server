@@ -1332,6 +1332,7 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
       bedrooms: p.bedrooms,
       bathrooms: p.bathrooms,
       isFeatured: p.isFeatured,
+      viewCount: p.viewCount,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
       street: p.street,
