@@ -19,32 +19,32 @@ export const PAYMENT_PROVIDERS: PaymentProvider[] = [
   {
     id: PaymentProviderEnum.TEST,
     name: 'test',
-    displayName: 'ტესტი (დეველოპმენტისთვის)',
+    displayName: 'Test (Development)',
     isEnabled: process.env.NODE_ENV === 'development',
     minAmount: 0.01,
     maxAmount: 10000,
     currency: 'GEL',
-    description: 'ტესტისთვის - მყისიერი შევსება'
+    description: 'For testing - instant top-up'
   },
   {
     id: PaymentProviderEnum.FLITT,
     name: 'flitt',
-    displayName: 'ბანკის ბარათი (Flitt)',
+    displayName: 'Bank Card (Flitt)',
     isEnabled: !!(process.env.FLITT_MERCHANT_ID && process.env.FLITT_SECRET_KEY),
     minAmount: 0.01,
     maxAmount: 10000,
     currency: 'GEL',
-    description: 'ონლაინ გადახდა ვიზა/მასტერკარდით'
+    description: 'Online payment with Visa/Mastercard'
   },
   {
     id: PaymentProviderEnum.BOG,
     name: 'bog',
-    displayName: 'საქართველოს ბანკი (BOG)',
+    displayName: 'Bank of Georgia (BOG)',
     isEnabled: !!(process.env.BOG_CLIENT_ID && (process.env.BOG_SECRET_KEY || process.env.BOG_CLIENT_SECRET)),
     minAmount: 0.01,
     maxAmount: 50000,
     currency: 'GEL',
-    description: 'ონლაინ გადახდა ბარათით, Apple Pay, Google Pay, განვადება'
+    description: 'Online payment with card, Apple Pay, Google Pay, installments'
   }
 ];
 
