@@ -37,8 +37,8 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
         'project.deliveryStatus', 'project.deliveryDate', 'project.numberOfBuildings',
         'project.totalApartments', 'project.numberOfFloors', 'project.viewCount',
         'project.developerId', 'project.createdAt',
-        'city.id', 'city.nameGeorgian',
-        'areaData.id', 'areaData.nameKa',
+        'city.id', 'city.nameGeorgian', 'city.nameEnglish', 'city.nameRussian',
+        'areaData.id', 'areaData.nameKa', 'areaData.nameEn', 'areaData.nameRu',
         'developer.id', 'developer.fullName', 'developer.email', 'developer.phone',
         'pricing'
       ]);
@@ -105,6 +105,20 @@ export const getProjectById = async (req: Request, res: Response): Promise<void>
       .leftJoinAndSelect('project.amenities', 'amenities')
       .where('project.id = :id', { id })
       .andWhere('project.isActive = :isActive', { isActive: true })
+      .select([
+        'project',
+        'city.id',
+        'city.nameGeorgian',
+        'city.nameEnglish',
+        'city.nameRussian',
+        'areaData.id',
+        'areaData.nameKa',
+        'areaData.nameEn',
+        'areaData.nameRu',
+        'developer',
+        'pricing',
+        'amenities'
+      ])
       .getOne();
 
     if (!project) {
@@ -167,6 +181,18 @@ export const getProjectsByDeveloperId = async (req: Request, res: Response): Pro
       .leftJoinAndSelect('project.pricing', 'pricing')
       .where('project.developerId = :developerId', { developerId })
       .andWhere('project.isActive = :isActive', { isActive: true })
+      .select([
+        'project',
+        'city.id',
+        'city.nameGeorgian',
+        'city.nameEnglish',
+        'city.nameRussian',
+        'areaData.id',
+        'areaData.nameKa',
+        'areaData.nameEn',
+        'areaData.nameRu',
+        'pricing'
+      ])
       .orderBy('project.createdAt', 'DESC');
 
     // Apply pagination
@@ -221,6 +247,18 @@ export const getUserProjects = async (req: AuthenticatedRequest, res: Response):
       .leftJoinAndSelect('project.areaData', 'areaData')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .where('project.developerId = :userId', { userId })
+      .select([
+        'project',
+        'city.id',
+        'city.nameGeorgian',
+        'city.nameEnglish',
+        'city.nameRussian',
+        'areaData.id',
+        'areaData.nameKa',
+        'areaData.nameEn',
+        'areaData.nameRu',
+        'pricing'
+      ])
       .orderBy('project.createdAt', 'DESC')
       .getMany();
 
