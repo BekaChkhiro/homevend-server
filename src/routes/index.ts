@@ -17,6 +17,7 @@ import vipRoutes from './vip.js';
 import serviceRoutes from './services.js';
 import autoRenewalRoutes from './autoRenewal.js';
 import serviceExpirationRoutes from './serviceExpiration.js';
+import uploadRoutes from './upload.js';
 
 const router = Router();
 
@@ -38,5 +39,6 @@ router.use('/vip', vipRoutes);
 router.use('/services', serviceRoutes);
 router.use('/auto-renewal', autoRenewalRoutes);
 router.use('/service-expiration', serviceExpirationRoutes);
+router.use('/upload', uploadRoutes);
 
 export default router;

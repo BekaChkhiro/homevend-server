@@ -472,6 +472,52 @@ export const removeAgentFromAgency = async (req: AuthenticatedRequest, res: Resp
   }
 };
 
+// Get current user's agency
+export const getCurrentAgency = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    console.log('getCurrentAgency called for user:', req.user?.id, 'role:', req.user?.role);
+    
+    const userId = req.user!.id;
+    console.log('Using user ID:', userId);
+    
+    const agencyRepository = AppDataSource.getRepository(Agency);
+
+    // Find the agency owned by the current user
+    const agency = await agencyRepository.findOne({
+      where: { ownerId: userId },
+      select: [
+        'id', 'uuid', 'name', 'description', 'phone', 'email', 
+        'website', 'socialMediaUrl', 'address', 'logoUrl', 'bannerUrl',
+        'isVerified', 'isActive', 'agentCount', 'propertyCount', 'totalSales',
+        'createdAt', 'updatedAt'
+      ]
+    });
+
+    console.log('Found agency:', agency ? `ID: ${agency.id}, Name: ${agency.name}` : 'No agency found');
+
+    if (!agency) {
+      console.log('No agency found for user ID:', userId);
+      res.status(404).json({
+        success: false,
+        message: 'Agency not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Agency retrieved successfully',
+      data: agency
+    });
+  } catch (error) {
+    console.error('Get current agency error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch agency'
+    });
+  }
+};
+
 // Get current user's agency users
 export const getMyAgencyUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {

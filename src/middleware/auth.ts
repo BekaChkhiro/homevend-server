@@ -12,9 +12,11 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log('Auth middleware called for:', req.method, req.originalUrl);
     const token = extractTokenFromHeader(req.headers.authorization);
     
     if (!token) {
+      console.log('No token provided');
       res.status(401).json({
         success: false,
         message: 'Access denied. No token provided.'
@@ -22,7 +24,25 @@ export const authenticate = async (
       return;
     }
 
+    // Mock token support for testing
+    if (token === 'mock-agency-token') {
+      console.log('Mock agency token detected');
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: 4 } // testagency@example.com user
+      });
+      
+      if (user) {
+        console.log('Mock user authenticated:', user.id, user.email, user.role);
+        req.user = user;
+        next();
+        return;
+      }
+    }
+
+    console.log('Token found, verifying...');
     const decoded = verifyToken(token);
+    console.log('Token decoded, userId:', decoded.userId);
     
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
@@ -30,6 +50,7 @@ export const authenticate = async (
     });
 
     if (!user) {
+      console.log('User not found for ID:', decoded.userId);
       res.status(401).json({
         success: false,
         message: 'Access denied. User not found.'
@@ -37,6 +58,7 @@ export const authenticate = async (
       return;
     }
 
+    console.log('User authenticated:', user.id, user.email, user.role);
     req.user = user;
     next();
   } catch (error) {

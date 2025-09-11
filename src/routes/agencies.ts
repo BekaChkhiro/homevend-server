@@ -5,6 +5,7 @@ import {
   updateAgency, 
   addAgentToAgency, 
   removeAgentFromAgency,
+  getCurrentAgency,
   getMyAgencyUsers,
   addUserToMyAgency,
   removeUserFromMyAgency
@@ -15,16 +16,19 @@ const router = Router();
 
 // Public routes
 router.get('/', getAgencies);
+
+// My agency management routes (must come BEFORE /:id routes)
+router.get('/my', authenticate, getCurrentAgency);
+router.get('/my/users', authenticate, getMyAgencyUsers);
+router.post('/my/users', authenticate, addUserToMyAgency);
+router.delete('/my/users/:userIdToRemove', authenticate, removeUserFromMyAgency);
+
+// Public route with ID parameter (must come AFTER specific routes)
 router.get('/:id', getAgencyById);
 
 // Protected routes (require authentication)
 router.put('/:id', authenticate, updateAgency);
 router.post('/:id/agents', authenticate, addAgentToAgency);
 router.delete('/:id/agents/:agentId', authenticate, removeAgentFromAgency);
-
-// My agency user management routes
-router.get('/my/users', authenticate, getMyAgencyUsers);
-router.post('/my/users', authenticate, addUserToMyAgency);
-router.delete('/my/users/:userIdToRemove', authenticate, removeUserFromMyAgency);
 
 export default router;
