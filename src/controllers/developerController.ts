@@ -375,18 +375,46 @@ export const getMyDeveloper = async (req: AuthenticatedRequest, res: Response): 
     }
 
     const developerRepository = AppDataSource.getRepository(Developer);
+    const userRepository = AppDataSource.getRepository(User);
     
-    const developer = await developerRepository.findOne({
+    // First, get the user to make sure they're a developer
+    const user = await userRepository.findOne({
+      where: { id: userId, role: UserRoleEnum.DEVELOPER }
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'Developer user not found'
+      });
+      return;
+    }
+
+    // Try to find existing developer record
+    let developer = await developerRepository.findOne({
       where: { ownerId: userId },
       relations: ['owner']
     });
 
+    // If no developer record exists, create one based on user data
     if (!developer) {
-      res.status(404).json({
-        success: false,
-        message: 'Developer profile not found'
+      developer = developerRepository.create({
+        ownerId: userId,
+        name: user.fullName || 'Developer Company',
+        phone: user.phone || '',
+        email: user.email,
+        website: '',
+        socialMediaUrl: '',
+        description: ''
       });
-      return;
+      
+      await developerRepository.save(developer);
+      
+      // Fetch the saved developer with relations
+      developer = await developerRepository.findOne({
+        where: { ownerId: userId },
+        relations: ['owner']
+      });
     }
 
     res.status(200).json({

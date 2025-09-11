@@ -180,7 +180,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         fullName: user.fullName,
         email: user.email,
-        role: user.role
+        role: user.role,
+        phoneNumber: user.phone
       },
       token: accessToken,
       refreshToken
@@ -212,6 +213,7 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
         fullName: user.fullName,
         email: user.email,
         role: user.role,
+        phoneNumber: user.phone,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
