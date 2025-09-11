@@ -1356,7 +1356,8 @@ export const getUserProperties = async (req: AuthenticatedRequest, res: Response
         id: p.city.id,
         code: p.city.code,
         nameGeorgian: p.city.nameGeorgian,
-        nameEnglish: p.city.nameEnglish
+        nameEnglish: p.city.nameEnglish,
+        nameRussian: p.city.nameRussian
       } : null,
       areaData: p.areaData ? {
         id: p.areaData.id,
