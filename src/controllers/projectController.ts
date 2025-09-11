@@ -28,6 +28,7 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.city', 'city')
       .leftJoinAndSelect('project.areaData', 'areaData')
+      .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .where('project.isActive = :isActive', { isActive: true })
       .select([
@@ -38,6 +39,7 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
         'project.developerId', 'project.createdAt',
         'city.id', 'city.nameGeorgian',
         'areaData.id', 'areaData.nameKa',
+        'developer.id', 'developer.fullName', 'developer.email', 'developer.phone',
         'pricing'
       ]);
 
@@ -98,6 +100,7 @@ export const getProjectById = async (req: Request, res: Response): Promise<void>
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.city', 'city')
       .leftJoinAndSelect('project.areaData', 'areaData')
+      .leftJoinAndSelect('project.developer', 'developer')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .leftJoinAndSelect('project.amenities', 'amenities')
       .where('project.id = :id', { id })
