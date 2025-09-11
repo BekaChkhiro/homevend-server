@@ -735,6 +735,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         'city.code',
         'city.nameGeorgian',
         'city.nameEnglish',
+        'city.nameRussian',
         'area.id',
         'area.nameKa',
         'area.nameEn',
@@ -1097,7 +1098,8 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         id: property.city?.id,
         code: property.city?.code,
         nameGeorgian: property.city?.nameGeorgian,
-        nameEnglish: property.city?.nameEnglish
+        nameEnglish: property.city?.nameEnglish,
+        nameRussian: property.city?.nameRussian
       },
       areaData: property.areaData ? {
         id: property.areaData.id,
@@ -1253,7 +1255,8 @@ export const getPropertyById = async (req: Request, res: Response): Promise<void
           id: property.city?.id,
           code: property.city?.code,
           nameGeorgian: property.city?.nameGeorgian,
-          nameEnglish: property.city?.nameEnglish
+          nameEnglish: property.city?.nameEnglish,
+          nameRussian: property.city?.nameRussian
         },
         areaData: property.areaData ? {
           id: property.areaData.id,
