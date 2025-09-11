@@ -51,6 +51,19 @@ export const favoritesController = {
         contactPhone: fav.property.contactPhone,
         createdAt: fav.property.createdAt,
         favoriteAddedAt: fav.createdAt,
+        cityData: fav.property.city ? {
+          id: fav.property.city.id,
+          code: fav.property.city.code,
+          nameGeorgian: fav.property.city.nameGeorgian,
+          nameEnglish: fav.property.city.nameEnglish,
+          nameRussian: fav.property.city.nameRussian
+        } : null,
+        areaData: fav.property.areaData ? {
+          id: fav.property.areaData.id,
+          nameKa: fav.property.areaData.nameKa,
+          nameEn: fav.property.areaData.nameEn,
+          nameRu: fav.property.areaData.nameRu
+        } : null,
         user: {
           id: fav.property.user.id,
           fullName: fav.property.user.fullName,
