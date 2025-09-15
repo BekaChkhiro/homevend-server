@@ -233,7 +233,7 @@ export class UniversalImageService {
   /**
    * Delete image
    */
-  async deleteImage(imageId: number, userId: number): Promise<void> {
+  async deleteImage(imageId: number, userId: number, userRole?: string): Promise<void> {
     const image = await this.imageRepo.findOne({
       where: { id: imageId },
       relations: ['uploadedBy'],
@@ -244,7 +244,7 @@ export class UniversalImageService {
     }
 
     // Check permission
-    if (!this.canDeleteImage(image, userId)) {
+    if (!this.canDeleteImage(image, userId, userRole)) {
       throw new Error('Unauthorized to delete this image');
     }
 
@@ -513,9 +513,13 @@ export class UniversalImageService {
     return filename.split('.').pop()?.toLowerCase() || 'jpg';
   }
 
-  private canDeleteImage(image: Image, userId: number): boolean {
-    // Implement your permission logic here
-    return image.uploadedById === userId; // Simplified
+  private canDeleteImage(image: Image, userId: number, userRole?: string): boolean {
+    // Admins can delete any image
+    if (userRole === 'admin') {
+      return true;
+    }
+    // Regular users can only delete their own images
+    return image.uploadedById === userId;
   }
 }
 

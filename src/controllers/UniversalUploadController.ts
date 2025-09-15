@@ -107,7 +107,8 @@ export class UniversalUploadController {
 
       await universalImageService.deleteImage(
         parseInt(imageId),
-        req.user.id
+        req.user.id,
+        req.user.role
       );
 
       return res.json({ success: true, message: 'Image deleted successfully' });
