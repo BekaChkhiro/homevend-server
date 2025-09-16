@@ -311,27 +311,57 @@ export const updateDeveloper = async (req: AuthenticatedRequest, res: Response):
     }
 
     const developerRepository = AppDataSource.getRepository(Developer);
-    
-    const developer = await developerRepository.findOne({
-      where: { id: parseInt(id) },
+    const userRepository = AppDataSource.getRepository(User);
+
+    // First, try to find existing developer by user ID (more reliable)
+    let developer = await developerRepository.findOne({
+      where: { ownerId: userId },
       relations: ['owner']
     });
 
-    if (!developer) {
-      res.status(404).json({
-        success: false,
-        message: 'Developer not found'
+    // If no developer found by user ID, try by the provided ID (but verify ownership)
+    if (!developer && id && id !== '1' && !isNaN(parseInt(id))) {
+      const developerById = await developerRepository.findOne({
+        where: { id: parseInt(id) },
+        relations: ['owner']
       });
-      return;
+
+      if (developerById && developerById.ownerId === userId) {
+        developer = developerById;
+      }
     }
 
-    // Check if user owns this developer profile
-    if (developer.ownerId !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Access denied'
+    // If still no developer found, create one
+    if (!developer) {
+      const user = await userRepository.findOne({
+        where: { id: userId, role: UserRoleEnum.DEVELOPER }
       });
-      return;
+
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found or not a developer'
+        });
+        return;
+      }
+
+      // Create a developer record
+      developer = developerRepository.create({
+        ownerId: userId,
+        name: user.fullName || 'Developer Company',
+        phone: user.phone,
+        email: user.email,
+        description: null,
+        website: null,
+        socialMediaUrl: null,
+        address: null,
+        taxNumber: null,
+        registrationNumber: null,
+        logoUrl: null,
+        bannerUrl: null
+      });
+
+      developer = await developerRepository.save(developer);
     }
 
     const updateData = { ...req.body };
@@ -341,10 +371,10 @@ export const updateDeveloper = async (req: AuthenticatedRequest, res: Response):
     delete updateData.createdAt;
     delete updateData.updatedAt;
 
-    await developerRepository.update(id, updateData);
+    await developerRepository.update(developer.id, updateData);
 
     const updatedDeveloper = await developerRepository.findOne({
-      where: { id: parseInt(id) },
+      where: { id: developer.id },
       relations: ['owner']
     });
 
@@ -376,18 +406,50 @@ export const getMyDeveloper = async (req: AuthenticatedRequest, res: Response): 
 
     const developerRepository = AppDataSource.getRepository(Developer);
     const userRepository = AppDataSource.getRepository(User);
-    
-    // First, get the user to make sure they're a developer
-    const user = await userRepository.findOne({
-      where: { id: userId, role: UserRoleEnum.DEVELOPER }
+    // First, check if there's a developer record
+    let developer = await developerRepository.findOne({
+      where: { ownerId: userId },
+      relations: ['owner']
     });
 
-    if (!user) {
-      res.status(404).json({
-        success: false,
-        message: 'Developer user not found'
+    // If no developer record exists, create one from user data
+    if (!developer) {
+      const user = await userRepository.findOne({
+        where: { id: userId, role: UserRoleEnum.DEVELOPER }
       });
-      return;
+
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found or not a developer'
+        });
+        return;
+      }
+
+      // Create a developer record with user's basic information
+      developer = developerRepository.create({
+        ownerId: userId,
+        name: user.fullName || 'Developer Company',
+        phone: user.phone,
+        email: user.email,
+        description: null,
+        website: null,
+        socialMediaUrl: null,
+        address: null,
+        taxNumber: null,
+        registrationNumber: null,
+        logoUrl: null,
+        bannerUrl: null
+      });
+
+      developer = await developerRepository.save(developer);
+
+      // Load the developer with owner relation
+      developer = await developerRepository.findOne({
+        where: { id: developer.id },
+        relations: ['owner']
+
+      });
     }
 
     // Try to find existing developer record

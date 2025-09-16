@@ -231,6 +231,8 @@ export const getUserProjects = async (req: AuthenticatedRequest, res: Response):
     const userRepository = AppDataSource.getRepository(User);
     const userId = req.user!.id;
 
+    console.log(`🎯 getUserProjects called for userId: ${userId}`);
+
     // Verify user is a developer
     const user = await userRepository.findOne({
       where: { id: userId, role: UserRoleEnum.DEVELOPER }
@@ -247,6 +249,7 @@ export const getUserProjects = async (req: AuthenticatedRequest, res: Response):
       .leftJoinAndSelect('project.areaData', 'areaData')
       .leftJoinAndSelect('project.pricing', 'pricing')
       .where('project.developerId = :userId', { userId })
+      .andWhere('project.isActive = :isActive', { isActive: true })
       .select([
         'project',
         'city.id',
@@ -261,6 +264,16 @@ export const getUserProjects = async (req: AuthenticatedRequest, res: Response):
       ])
       .orderBy('project.createdAt', 'DESC')
       .getMany();
+
+    console.log(`📋 Found ${projects.length} active projects for user ${userId}`);
+    console.log(`🔍 Project IDs: ${projects.map(p => p.id).join(', ')}`);
+
+    // Set cache control headers to prevent caching
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
 
     res.json(projects);
   } catch (error) {
@@ -698,18 +711,30 @@ export const deleteProject = async (req: AuthenticatedRequest, res: Response): P
     const { id } = req.params;
     const userId = req.user!.id;
 
+    console.log(`🗑️ deleteProject called - Project ID: ${id}, User ID: ${userId}`);
+
     // Find project and verify ownership
     const project = await projectRepository.findOne({
       where: { id: parseInt(id), developerId: userId }
     });
 
     if (!project) {
+      console.log(`❌ Project ${id} not found or access denied for user ${userId}`);
       res.status(404).json({ message: 'Project not found or access denied' });
       return;
     }
 
+    console.log(`📝 Project before deletion: ID=${project.id}, isActive=${project.isActive}, developerId=${project.developerId}`);
+
     // Soft delete - set isActive to false
     await projectRepository.update(project.id, { isActive: false });
+
+    // Verify the update worked
+    const updatedProject = await projectRepository.findOne({
+      where: { id: project.id }
+    });
+    
+    console.log(`✅ Project after deletion: ID=${updatedProject?.id}, isActive=${updatedProject?.isActive}`);
 
     res.json({ message: 'Project deleted successfully' });
   } catch (error) {

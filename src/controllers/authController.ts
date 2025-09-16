@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { AppDataSource } from '../config/database.js';
 import { User, UserRoleEnum } from '../models/User.js';
 import { Agency } from '../models/Agency.js';
+import { Developer } from '../models/Developer.js';
 import { generateToken } from '../utils/jwt.js';
 import { generateTokenPair, verifyRefreshToken, generateAccessToken, revokeRefreshToken } from '../utils/refreshToken.js';
 import { LoginResponse } from '../types/auth.js';
@@ -12,6 +13,7 @@ import emailService from '../services/emailService.js';
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('🔄 Registration request received for email:', req.body.email);
+    console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
     const { fullName, email, password, role = UserRoleEnum.USER, agencyData, developerData } = req.body;
 
     const userRepository = AppDataSource.getRepository(User);
@@ -78,7 +80,25 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         savedAgency = await manager.save(Agency, agency);
       }
 
-      return { savedUser, savedAgency };
+      // If registering as developer, create developer record
+      let savedDeveloper = null;
+      if (role === UserRoleEnum.DEVELOPER && developerData) {
+        console.log('🏗️ Creating developer record for user:', savedUser.id);
+        console.log('📊 Developer data:', developerData);
+
+        const developer = new Developer();
+        developer.ownerId = savedUser.id;
+        developer.name = developerData.name;
+        developer.phone = developerData.phone;
+        developer.website = developerData.website || null;
+        developer.socialMediaUrl = developerData.socialMediaUrl || null;
+        developer.email = email; // Use same email as user
+
+        savedDeveloper = await manager.save(Developer, developer);
+        console.log('✅ Developer saved with ID:', savedDeveloper.id);
+      }
+
+      return { savedUser, savedAgency, savedDeveloper };
     });
 
     console.log('✅ User saved to database with verification token:', result.savedUser.verificationToken);
@@ -97,7 +117,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         email: result.savedUser.email,
         role: result.savedUser.role,
         phoneNumber: result.savedUser.phone,
-        ...(result.savedAgency && { agencyId: result.savedAgency.id })
+        ...(result.savedAgency && { agencyId: result.savedAgency.id }),
+        ...(result.savedDeveloper && { developerId: result.savedDeveloper.id })
       },
       token: accessToken,
       refreshToken
@@ -132,11 +153,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       message,
       data: response
     });
-  } catch (error) {
-    console.error('Registration error:', error);
+  } catch (error: any) {
+    console.error('❌ Registration error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+
     res.status(500).json({
       success: false,
-      message: 'Internal server error during registration'
+      message: 'Internal server error during registration',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

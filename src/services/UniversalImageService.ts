@@ -388,6 +388,16 @@ export class UniversalImageService {
         acceptedTypes: ['image/jpeg', 'image/png', 'image/svg+xml'],
         preserveTransparency: true,
       }],
+      ['developer_logo', {
+        maxFiles: 1,
+        maxSize: 2,
+        sizes: [
+          { name: 'small', width: 100, height: 100, quality: 90 },
+          { name: 'medium', width: 200, height: 200, quality: 90 },
+        ],
+        acceptedTypes: ['image/jpeg', 'image/png', 'image/svg+xml'],
+        preserveTransparency: true,
+      }],
       ['project_gallery', {
         maxFiles: 20,
         maxSize: 10,
