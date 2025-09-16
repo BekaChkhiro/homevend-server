@@ -10,11 +10,10 @@ import {
   forgotPassword,
   resetPassword,
   validateResetToken
-} from '../controllers/AuthController.js';
+} from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../utils/validation.js';
-import { authRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 

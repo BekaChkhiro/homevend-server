@@ -406,6 +406,7 @@ export const getMyDeveloper = async (req: AuthenticatedRequest, res: Response): 
 
     const developerRepository = AppDataSource.getRepository(Developer);
     const userRepository = AppDataSource.getRepository(User);
+
     // First, check if there's a developer record
     let developer = await developerRepository.findOne({
       where: { ownerId: userId },
@@ -430,11 +431,11 @@ export const getMyDeveloper = async (req: AuthenticatedRequest, res: Response): 
       developer = developerRepository.create({
         ownerId: userId,
         name: user.fullName || 'Developer Company',
-        phone: user.phone,
+        phone: user.phone || '',
         email: user.email,
-        description: null,
-        website: null,
-        socialMediaUrl: null,
+        description: '',
+        website: '',
+        socialMediaUrl: '',
         address: null,
         taxNumber: null,
         registrationNumber: null,
@@ -447,34 +448,6 @@ export const getMyDeveloper = async (req: AuthenticatedRequest, res: Response): 
       // Load the developer with owner relation
       developer = await developerRepository.findOne({
         where: { id: developer.id },
-        relations: ['owner']
-
-      });
-    }
-
-    // Try to find existing developer record
-    let developer = await developerRepository.findOne({
-      where: { ownerId: userId },
-      relations: ['owner']
-    });
-
-    // If no developer record exists, create one based on user data
-    if (!developer) {
-      developer = developerRepository.create({
-        ownerId: userId,
-        name: user.fullName || 'Developer Company',
-        phone: user.phone || '',
-        email: user.email,
-        website: '',
-        socialMediaUrl: '',
-        description: ''
-      });
-      
-      await developerRepository.save(developer);
-      
-      // Fetch the saved developer with relations
-      developer = await developerRepository.findOne({
-        where: { ownerId: userId },
         relations: ['owner']
       });
     }
