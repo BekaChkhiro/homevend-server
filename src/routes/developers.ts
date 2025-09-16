@@ -5,7 +5,7 @@ import {
   createDeveloper,
   updateDeveloper,
   getMyDeveloper
-} from '../controllers/developerController.js';
+} from '../controllers/DeveloperController.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
