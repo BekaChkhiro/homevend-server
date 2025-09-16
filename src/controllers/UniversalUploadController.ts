@@ -19,9 +19,6 @@ export class UniversalUploadController {
       const { purpose = 'gallery', altText, caption, tags } = req.body;
       const files = req.files as Express.Multer.File[];
 
-      console.log(`🎯 Upload request: ${req.method} ${req.path}`);
-      console.log(`📂 Entity: ${entityType}/${entityId}, Purpose: ${purpose}`);
-      console.log(`📎 Files received: ${files?.length || 0}`);
 
       if (!files || files.length === 0) {
         return res.status(400).json({ error: 'No files provided' });
@@ -50,7 +47,6 @@ export class UniversalUploadController {
         }
       }
 
-      console.log(`👤 Using userId: ${userId} (debug: ${isDebugRoute})`);
 
       // Upload images
       const images = await universalImageService.uploadMultiple({
@@ -80,6 +76,7 @@ export class UniversalUploadController {
       const { entityType, entityId } = req.params;
       const { purpose } = req.query;
 
+
       // Validate entity type
       if (!Object.values(EntityType).includes(entityType as EntityType)) {
         return res.status(400).json({ error: 'Invalid entity type' });
@@ -90,6 +87,7 @@ export class UniversalUploadController {
         parseInt(entityId),
         purpose as string
       );
+
 
       return res.json({ images });
     } catch (error: any) {
@@ -221,6 +219,21 @@ export class UniversalUploadController {
       case EntityType.PROJECT:
         // For now, allow all authenticated users
         // You can add project ownership checks here
+        return true;
+
+      case EntityType.DEVELOPER:
+        // For now, allow all authenticated users
+        // You can add developer ownership checks here
+        return true;
+
+      case EntityType.DISTRICT:
+        // For now, allow all authenticated users
+        // You can add district ownership checks here
+        return true;
+
+      case EntityType.ADVERTISEMENT:
+        // For now, allow all authenticated users
+        // You can add advertisement ownership checks here
         return true;
 
       default:

@@ -17,6 +17,7 @@ import { UserFavorite } from '../models/UserFavorite.js';
 import { PropertyInquiry } from '../models/PropertyInquiry.js';
 import { PropertyView } from '../models/PropertyView.js';
 import { Agency } from '../models/Agency.js';
+import { Developer } from '../models/Developer.js';
 import { Project } from '../models/Project.js';
 import { ProjectPricing } from '../models/ProjectPricing.js';
 import { ProjectAmenity } from '../models/ProjectAmenity.js';
@@ -48,21 +49,22 @@ export const AppDataSource = new DataSource({
   synchronize: false, // Always use migrations instead
   logging: false,
   entities: [
-    User, 
-    Property, 
-    District, 
+    User,
+    Property,
+    District,
     Area,
-    PriceStatistic, 
-    City, 
-    Feature, 
-    Advantage, 
-    FurnitureAppliance, 
-    Tag, 
-    PropertyPhoto, 
-    UserFavorite, 
-    PropertyInquiry, 
+    PriceStatistic,
+    City,
+    Feature,
+    Advantage,
+    FurnitureAppliance,
+    Tag,
+    PropertyPhoto,
+    UserFavorite,
+    PropertyInquiry,
     PropertyView,
     Agency,
+    Developer,
     Project,
     ProjectPricing,
     ProjectAmenity,
