@@ -26,6 +26,7 @@ import { VipPricing } from '../models/VipPricing.js';
 import { ServicePricing } from '../models/ServicePricing.js';
 import { PropertyService } from '../models/PropertyService.js';
 import { Image } from '../models/Image.js';
+import { TermsConditions } from '../models/TermsConditions.js';
 
 // Create a new DataSource instance with proper typing
 // Use DATABASE_URL if available, otherwise use individual parameters
@@ -72,7 +73,8 @@ export const AppDataSource = new DataSource({
     VipPricing,
     ServicePricing,
     PropertyService,
-    Image
+    Image,
+    TermsConditions
   ],
   migrations: ['dist/migrations/*.js'],
   subscribers: ['dist/subscribers/*.js']

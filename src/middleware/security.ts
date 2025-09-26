@@ -48,34 +48,52 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction): 
 };
 
 export const preventSQLInjection = (req: Request, res: Response, next: NextFunction): void => {
+  // Content fields that should be excluded from SQL injection checking
+  const contentFields = ['content', 'contentKa', 'contentEn', 'contentRu', 'description', 'text', 'body', 'message'];
+
+  // More specific SQL injection patterns to avoid false positives
   const sqlPatterns = [
-    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|EXEC|SCRIPT)\b)/gi,
-    /(--|\||;|\/\*|\*\/|xp_|sp_|0x)/gi,
-    /(\bOR\b\s*\d+\s*=\s*\d+)/gi,
-    /(\bAND\b\s*\d+\s*=\s*\d+)/gi
+    // Classic SQL injection patterns with context
+    /(^|\s)(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\s+.*(FROM|INTO|SET|WHERE|VALUES)/gi,
+    // SQL comments and terminators
+    /(--\s|\/\*|\*\/|;$|\|\|)/g,
+    // SQL system procedures
+    /(xp_|sp_cmdshell|master\.|information_schema\.)/gi,
+    // Boolean-based injection patterns
+    /(\bOR\b\s+\d+\s*=\s*\d+|\bAND\b\s+\d+\s*=\s*\d+)/gi,
+    // UNION-based injection
+    /UNION(\s+ALL)?\s+SELECT/gi
   ];
-  
-  const checkForSQLInjection = (value: any): boolean => {
+
+  const checkForSQLInjection = (value: any, fieldName?: string): boolean => {
     if (typeof value !== 'string') return false;
+
+    // Skip content fields to avoid false positives
+    if (fieldName && contentFields.some(field => fieldName.toLowerCase().includes(field))) {
+      return false;
+    }
+
     return sqlPatterns.some(pattern => pattern.test(value));
   };
-  
-  const checkObject = (obj: any): boolean => {
+
+  const checkObject = (obj: any, parentKey?: string): boolean => {
     if (!obj || typeof obj !== 'object') return false;
-    
+
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
         const value = obj[key];
-        if (typeof value === 'string' && checkForSQLInjection(value)) {
+        const fullKey = parentKey ? `${parentKey}.${key}` : key;
+
+        if (typeof value === 'string' && checkForSQLInjection(value, fullKey)) {
           return true;
         } else if (typeof value === 'object') {
-          if (checkObject(value)) return true;
+          if (checkObject(value, fullKey)) return true;
         }
       }
     }
     return false;
   };
-  
+
   // Check all request data for SQL injection patterns
   if (checkObject(req.body)) {
     res.status(400).json({
@@ -84,13 +102,13 @@ export const preventSQLInjection = (req: Request, res: Response, next: NextFunct
     });
     return;
   }
-  
+
   // Check query and params without modifying them
-  const queryValues = Object.values(req.query || {});
-  const paramValues = Object.values(req.params || {});
-  
-  for (const value of [...queryValues, ...paramValues]) {
-    if (typeof value === 'string' && checkForSQLInjection(value)) {
+  const queryValues = Object.entries(req.query || {});
+  const paramValues = Object.entries(req.params || {});
+
+  for (const [key, value] of [...queryValues, ...paramValues]) {
+    if (typeof value === 'string' && checkForSQLInjection(value, key)) {
       res.status(400).json({
         success: false,
         message: 'Invalid input detected'
@@ -98,6 +116,6 @@ export const preventSQLInjection = (req: Request, res: Response, next: NextFunct
       return;
     }
   }
-  
+
   next();
 };
