@@ -182,21 +182,25 @@ export class FlittPaymentService {
   }
 
   /**
-   * Get order status from Flitt
+   * Get order status from Flitt API
    */
   async getOrderStatus(orderId: string): Promise<any> {
     const params = {
+      version: '1.0.1',
       merchant_id: this.merchantId,
       order_id: orderId
     };
 
     const signature = this.generateSignature(params);
-    const requestData = { ...params, signature };
+    const requestPayload = {
+      request: { ...params, signature }
+    };
 
     try {
+      console.log(`🔄 Checking Flitt order status for: ${orderId}`);
       const response = await axios.post(
-        `${this.baseUrl}/api/get_order_status/`,
-        requestData,
+        `${this.baseUrl}/api/status/order_id`,
+        requestPayload,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -206,10 +210,29 @@ export class FlittPaymentService {
         }
       );
 
-      return response.data;
+      console.log(`📊 Flitt order status response for ${orderId}:`, response.data);
+      return response.data.response || response.data;
     } catch (error: any) {
-      console.error('Flitt Order Status Error:', error.response?.data || error.message);
+      console.error(`❌ Flitt Order Status Error for ${orderId}:`, error.response?.data || error.message);
       throw error;
     }
+  }
+
+  /**
+   * Check if order is completed based on Flitt response
+   */
+  isOrderCompleted(orderStatusResponse: any): boolean {
+    return orderStatusResponse.order_status === 'approved' &&
+           orderStatusResponse.response_status === 'success';
+  }
+
+  /**
+   * Check if order is failed
+   */
+  isOrderFailed(orderStatusResponse: any): boolean {
+    return orderStatusResponse.order_status === 'failed' ||
+           orderStatusResponse.order_status === 'declined' ||
+           orderStatusResponse.order_status === 'expired' ||
+           orderStatusResponse.response_status === 'failure';
   }
 }

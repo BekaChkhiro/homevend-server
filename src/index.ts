@@ -15,6 +15,7 @@ import { sanitizeInput, preventSQLInjection } from './middleware/security.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
 import { initializeScheduler } from './utils/scheduler.js';
 import { startPaymentVerificationJob } from './utils/paymentVerification.js';
+import { flittScheduler } from './services/FlittScheduler.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -82,9 +83,13 @@ const startServer = async () => {
     
     // Initialize scheduled tasks after database connection
     initializeScheduler();
-    
+
     // Start payment verification job
     startPaymentVerificationJob();
+
+    // Start Flitt automatic verification scheduler (every 2 minutes)
+    flittScheduler.start(2);
+    console.log('🔄 Flitt automatic verification scheduler started');
     
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
