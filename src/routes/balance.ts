@@ -18,6 +18,8 @@ import { User } from '../models/User.js';
 import { BogPaymentService } from '../services/payments/BogPaymentService.js';
 import { verifySinglePayment, paymentVerificationScheduler, verifyUserPendingPayments } from '../utils/paymentVerification.js';
 import { LessThan, MoreThan } from 'typeorm';
+import FlittVerificationService from '../services/FlittVerificationService.js';
+import { flittScheduler } from '../services/FlittScheduler.js';
 
 const router = Router();
 
@@ -222,6 +224,175 @@ router.get('/flitt/debug/transaction/:orderId', async (req: Request, res: Respon
       }
     });
   } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Flitt verification endpoints
+router.post('/flitt/verify-single/:transactionId', async (req: Request, res: Response) => {
+  try {
+    const { transactionId } = req.params;
+    console.log(`🔄 Manual Flitt verification requested for transaction: ${transactionId}`);
+
+    const verificationService = new FlittVerificationService();
+    const result = await verificationService.verifySingleTransaction(transactionId);
+
+    res.json({
+      success: true,
+      result
+    });
+  } catch (error: any) {
+    console.error('Manual Flitt verification error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Verify all pending Flitt transactions
+router.post('/flitt/verify-all', async (req: Request, res: Response) => {
+  try {
+    console.log('🔄 Manual verification of all pending Flitt transactions requested');
+
+    const verificationService = new FlittVerificationService();
+    const results = await verificationService.verifyAllPendingTransactions();
+
+    const summary = {
+      total: results.length,
+      completed: results.filter(r => r.status === 'completed').length,
+      failed: results.filter(r => r.status === 'failed').length,
+      pending: results.filter(r => r.status === 'pending').length,
+      errors: results.filter(r => r.status === 'error').length
+    };
+
+    res.json({
+      success: true,
+      summary,
+      results
+    });
+  } catch (error: any) {
+    console.error('Bulk Flitt verification error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get Flitt scheduler status
+router.get('/flitt/scheduler/status', async (req: Request, res: Response) => {
+  try {
+    const status = flittScheduler.getStatus();
+    res.json({
+      success: true,
+      scheduler: status
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Start Flitt scheduler
+router.post('/flitt/scheduler/start', async (req: Request, res: Response) => {
+  try {
+    const { intervalMinutes = 2 } = req.body;
+    flittScheduler.start(intervalMinutes);
+
+    res.json({
+      success: true,
+      message: `Flitt scheduler started with ${intervalMinutes} minute interval`,
+      status: flittScheduler.getStatus()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Stop Flitt scheduler
+router.post('/flitt/scheduler/stop', async (req: Request, res: Response) => {
+  try {
+    flittScheduler.stop();
+
+    res.json({
+      success: true,
+      message: 'Flitt scheduler stopped',
+      status: flittScheduler.getStatus()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Run Flitt verification now
+router.post('/flitt/scheduler/run-now', async (req: Request, res: Response) => {
+  try {
+    const result = await flittScheduler.runNow();
+
+    res.json({
+      success: true,
+      message: 'Manual verification completed',
+      result
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Immediate verification for user after payment return (no auth for frontend)
+router.post('/flitt/verify-immediate/:userId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = parseInt(req.params.userId);
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+      return;
+    }
+
+    console.log(`🚀 Immediate Flitt verification requested for user ${userId}`);
+
+    const flittVerificationService = new FlittVerificationService();
+    const results = await flittVerificationService.verifyUserPendingTransactions(userId);
+
+    const summary = {
+      total: results.length,
+      completed: results.filter(r => r.status === 'completed').length,
+      failed: results.filter(r => r.status === 'failed').length,
+      pending: results.filter(r => r.status === 'pending').length,
+      errors: results.filter(r => r.status === 'error').length
+    };
+
+    // Log success
+    if (summary.completed > 0) {
+      console.log(`✅ Immediate verification completed ${summary.completed} payments for user ${userId}`);
+    }
+
+    res.json({
+      success: true,
+      summary,
+      results,
+      message: `Verified ${results.length} transactions immediately`
+    });
+  } catch (error: any) {
+    console.error('Immediate Flitt verification error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -1250,39 +1421,14 @@ router.post('/check-recent-payments', async (req: AuthenticatedRequest, res: Res
       results = await verifyUserPendingPayments(userId);
     }
 
-    // For Flitt transactions, check if they were already completed by callback
-    for (const flittTx of flittTransactions) {
-      // Refresh transaction from database to see if callback already processed it
-      const transactionRepository = AppDataSource.getRepository(Transaction);
-      const updatedTx = await transactionRepository.findOne({
-        where: { uuid: flittTx.uuid }
-      });
+    // For Flitt transactions, use API verification if callbacks haven't been received
+    if (flittTransactions.length > 0) {
+      console.log(`🔄 Triggering Flitt API verification for ${flittTransactions.length} transactions`);
+      const flittVerificationService = new FlittVerificationService();
+      const flittResults = await flittVerificationService.verifyUserPendingTransactions(userId);
 
-      if (updatedTx) {
-        if (updatedTx.status === TransactionStatusEnum.COMPLETED) {
-          results.push({
-            transactionId: updatedTx.uuid,
-            status: 'completed',
-            message: 'Flitt payment completed via callback',
-            balanceUpdate: {
-              added: parseFloat(updatedTx.amount.toString()),
-              newBalance: updatedTx.balanceAfter ? parseFloat(updatedTx.balanceAfter.toString()) : null
-            }
-          });
-        } else if (updatedTx.status === TransactionStatusEnum.FAILED) {
-          results.push({
-            transactionId: updatedTx.uuid,
-            status: 'failed',
-            message: 'Flitt payment failed'
-          });
-        } else {
-          results.push({
-            transactionId: updatedTx.uuid,
-            status: 'pending',
-            message: 'Flitt payment still pending (callback not yet received)'
-          });
-        }
-      }
+      // Add Flitt results to the overall results
+      results.push(...flittResults);
     }
     
     // Check if any payments were completed
