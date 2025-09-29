@@ -83,6 +83,16 @@ export class FlittVerificationService {
         return await this.failTransaction(transaction, flittStatus);
       }
 
+      // Check if payment expired (created too long ago)
+      if (this.flittService.isOrderExpired(flittStatus, transaction.createdAt)) {
+        console.log(`⏰ Flitt payment expired for transaction ${transaction.uuid} (created ${transaction.createdAt})`);
+        return await this.failTransaction(transaction, {
+          ...flittStatus,
+          order_status: 'expired',
+          response_description: 'Payment expired - no user action within timeout period'
+        });
+      }
+
       // Still pending
       return {
         transactionId: transaction.uuid,

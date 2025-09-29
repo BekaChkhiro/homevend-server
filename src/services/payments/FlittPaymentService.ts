@@ -233,6 +233,20 @@ export class FlittPaymentService {
     return orderStatusResponse.order_status === 'failed' ||
            orderStatusResponse.order_status === 'declined' ||
            orderStatusResponse.order_status === 'expired' ||
+           orderStatusResponse.order_status === 'canceled' ||
+           orderStatusResponse.order_status === 'cancelled' ||
            orderStatusResponse.response_status === 'failure';
+  }
+
+  /**
+   * Check if order should be considered expired based on time
+   */
+  isOrderExpired(orderStatusResponse: any, createdAt: Date): boolean {
+    // If order is still in 'created' state after 30 minutes, consider it expired
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+    return (orderStatusResponse.order_status === 'created' ||
+            orderStatusResponse.order_status === 'new') &&
+           createdAt < thirtyMinutesAgo;
   }
 }
