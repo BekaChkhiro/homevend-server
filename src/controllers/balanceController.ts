@@ -213,7 +213,7 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
-          responseUrl: `${baseUrl}/dashboard/balance?payment=success`
+          responseUrl: `${baseUrl}/en/dashboard/balance?payment=success`
         });
 
         const orderResult = await flittService.createOrder({
@@ -221,7 +221,7 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
-          responseUrl: `${baseUrl}/dashboard/balance?payment=success`
+          responseUrl: `${baseUrl}/en/dashboard/balance?payment=success`
         });
 
         console.log('🔄 Flitt order result:', orderResult);
@@ -294,8 +294,8 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           currency: 'GEL',
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/bog/callback`,
-          successUrl: `${baseUrl}/dashboard/balance?payment=success`,
-          failUrl: `${baseUrl}/dashboard/balance?payment=failed`,
+          successUrl: `${baseUrl}/en/dashboard/balance?payment=success`,
+          failUrl: `${baseUrl}/en/dashboard/balance?payment=failed`,
           paymentMethods: ['card'],  // Only card payments for now
           ttl: 15,
           buyer: {
