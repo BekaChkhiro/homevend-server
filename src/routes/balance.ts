@@ -26,6 +26,32 @@ const router = Router();
 // Webhook endpoints (no authentication required)
 router.post('/flitt/callback', handleFlittCallback);
 
+// Flitt return URL debug endpoint (to capture what URL Flitt actually uses)
+router.get('/flitt/return-debug', async (req: Request, res: Response) => {
+  console.log('🚨 FLITT RETURN DEBUG - Captured redirect URL:', {
+    fullUrl: req.protocol + '://' + req.get('host') + req.originalUrl,
+    path: req.path,
+    query: req.query,
+    params: req.params,
+    headers: {
+      'user-agent': req.headers['user-agent'],
+      'referer': req.headers['referer'],
+      'host': req.headers['host']
+    },
+    timestamp: new Date().toISOString()
+  });
+
+  // Extract any query parameters that Flitt might be sending
+  const queryParams = new URLSearchParams(req.query as any);
+  console.log('🚨 FLITT QUERY PARAMETERS:', Object.fromEntries(queryParams.entries()));
+
+  // Redirect to the actual payment success page with detected parameters
+  const redirectUrl = `https://homevend.ge/en/dashboard/balance?${queryParams.toString()}`;
+  console.log('🚨 FLITT RETURN DEBUG - Redirecting to:', redirectUrl);
+
+  res.redirect(302, redirectUrl);
+});
+
 // Flitt test endpoints for debugging
 router.post('/flitt/test-callback', async (req: Request, res: Response) => {
   const {
