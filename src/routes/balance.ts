@@ -186,7 +186,7 @@ router.get('/flitt/debug/pending', async (req: Request, res: Response) => {
 });
 
 // Debug endpoint to check Flitt transaction status by order ID
-router.get('/flitt/debug/transaction/:orderId', async (req: Request, res: Response) => {
+router.get('/flitt/debug/transaction/:orderId', async (req: Request, res: Response): Promise<void> => {
   try {
     const { orderId } = req.params;
     const transactionRepository = AppDataSource.getRepository(Transaction);
@@ -197,10 +197,11 @@ router.get('/flitt/debug/transaction/:orderId', async (req: Request, res: Respon
     });
 
     if (!transaction) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Transaction not found'
       });
+      return;
     }
 
     res.json({
