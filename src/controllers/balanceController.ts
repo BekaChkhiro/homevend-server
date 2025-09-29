@@ -208,12 +208,16 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
         const flittService = new FlittPaymentService();
         const baseUrl = process.env.BASE_URL || 'https://homevend.ge';
         
+        // TEMPORARY DEBUG: Use debug endpoint to capture what URL Flitt actually uses
+        const debugResponseUrl = `${baseUrl}/api/balance/flitt/return-debug?payment=success`;
+
+        console.log('🚨 FLITT DEBUG MODE: Using debug responseUrl:', debugResponseUrl);
         console.log('🔄 Creating Flitt order with params:', {
           orderId: orderId,
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
-          responseUrl: `${baseUrl}/en/dashboard/balance?payment=success`
+          responseUrl: debugResponseUrl
         });
 
         const orderResult = await flittService.createOrder({
@@ -221,7 +225,7 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
-          responseUrl: `${baseUrl}/en/dashboard/balance?payment=success`
+          responseUrl: debugResponseUrl
         });
 
         console.log('🔄 Flitt order result:', orderResult);
