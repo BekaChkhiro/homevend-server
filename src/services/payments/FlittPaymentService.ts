@@ -81,8 +81,29 @@ export class FlittPaymentService {
   public verifySignature(callbackData: FlittCallbackData): boolean {
     const receivedSignature = callbackData.signature;
     const calculatedSignature = this.generateSignature(callbackData);
-    
-    return receivedSignature === calculatedSignature;
+
+    const isValid = receivedSignature === calculatedSignature;
+
+    if (!isValid) {
+      console.error('🔒 Signature verification failed:', {
+        received: receivedSignature,
+        calculated: calculatedSignature,
+        order_id: callbackData.order_id,
+        amount: callbackData.amount
+      });
+
+      // Log the parameters used for signature generation for debugging
+      const filteredParams: Record<string, string> = {};
+      Object.keys(callbackData).forEach(key => {
+        const value = callbackData[key];
+        if (value !== null && value !== undefined && value !== '' && key !== 'signature') {
+          filteredParams[key] = String(value);
+        }
+      });
+      console.error('🔒 Parameters used for signature:', Object.keys(filteredParams).sort());
+    }
+
+    return isValid;
   }
 
   /**
@@ -98,7 +119,7 @@ export class FlittPaymentService {
     const orderData: FlittOrderRequest = {
       merchant_id: this.merchantId,
       order_id: params.orderId,
-      amount: Math.round(params.amount * 100).toString(), // Convert to tetri (cents)
+      amount: Math.round(params.amount * 100).toString(), // Convert to tetri (cents) for Flitt API
       currency: 'GEL',
       order_desc: params.description,
       server_callback_url: params.callbackUrl,
