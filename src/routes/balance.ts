@@ -24,6 +24,210 @@ const router = Router();
 // Webhook endpoints (no authentication required)
 router.post('/flitt/callback', handleFlittCallback);
 
+// Flitt test endpoints for debugging
+router.post('/flitt/test-callback', async (req: Request, res: Response) => {
+  const {
+    orderId,
+    status = 'approved',
+    responseStatus = 'success',
+    amount = '100',
+    actualAmount,
+    paymentId = `test_${Date.now()}`,
+    signature
+  } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({
+      error: 'Please provide orderId (the order ID from your transaction)'
+    });
+  }
+
+  // Simulate Flitt callback format based on documentation
+  const testCallback = {
+    rrn: "111111111111",
+    masked_card: "444455XXXXXX1111",
+    sender_cell_phone: "",
+    sender_account: "",
+    currency: "GEL",
+    fee: "",
+    reversal_amount: "0",
+    settlement_amount: "0",
+    actual_amount: actualAmount || amount, // Amounts in callback are in GEL
+    response_description: "",
+    sender_email: "test@test.com",
+    order_status: status, // 'approved' for success
+    response_status: responseStatus, // 'success' for successful payment
+    order_time: new Date().toISOString().replace('T', ' ').split('.')[0],
+    actual_currency: "GEL",
+    order_id: orderId,
+    tran_type: "purchase",
+    eci: "5",
+    settlement_date: "",
+    payment_system: "card",
+    approval_code: "123456",
+    merchant_id: process.env.FLITT_MERCHANT_ID || 1549901,
+    settlement_currency: "",
+    payment_id: paymentId,
+    card_bin: 444455,
+    response_code: "",
+    card_type: "VISA",
+    amount: amount, // Amount field in callback is in GEL
+    signature: signature || "test_signature", // Will be recalculated if needed
+    product_id: "",
+    merchant_data: "Test merchant data",
+    rectoken: "",
+    rectoken_lifetime: "",
+    verification_status: "",
+    parent_order_id: "",
+    fee_oplata: "0",
+    additional_info: JSON.stringify({
+      capture_status: null,
+      capture_amount: null,
+      reservation_data: "{}",
+      transaction_id: Date.now(),
+      bank_response_code: null,
+      bank_response_description: null,
+      client_fee: 0.0,
+      settlement_fee: 0.0,
+      bank_name: null,
+      bank_country: null,
+      card_type: "VISA",
+      card_product: "empty_visa",
+      card_category: null,
+      timeend: new Date().toISOString().replace('T', ' ').split('.')[0],
+      ipaddress_v4: "127.0.0.1",
+      payment_method: "card",
+      version_3ds: 1,
+      is_test: true
+    })
+  };
+
+  console.log('🧪 Simulating Flitt callback with:', {
+    orderId,
+    status,
+    responseStatus,
+    amount,
+    actualAmount: testCallback.actual_amount
+  });
+
+  // Forward to actual Flitt callback handler
+  req.body = testCallback;
+  return handleFlittCallback(req, res);
+});
+
+// Test successful Flitt payment
+router.post('/flitt/test-success/:orderId', async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  const { amount = '50' } = req.body;
+
+  console.log(`🧪 Simulating successful Flitt payment for order ${orderId}`);
+
+  req.body = {
+    orderId,
+    status: 'approved',
+    responseStatus: 'success',
+    amount,
+    actualAmount: amount
+  };
+
+  return res.redirect(307, '/api/balance/flitt/test-callback');
+});
+
+// Test failed Flitt payment
+router.post('/flitt/test-failed/:orderId', async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  const { reason = 'declined' } = req.body;
+
+  console.log(`🧪 Simulating failed Flitt payment for order ${orderId}`);
+
+  req.body = {
+    orderId,
+    status: reason,
+    responseStatus: 'failure',
+    amount: '50'
+  };
+
+  return res.redirect(307, '/api/balance/flitt/test-callback');
+});
+
+// Debug endpoint to check Flitt transactions
+router.get('/flitt/debug/pending', async (req: Request, res: Response) => {
+  try {
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    const pendingTransactions = await transactionRepository.find({
+      where: {
+        type: TransactionTypeEnum.TOP_UP,
+        status: TransactionStatusEnum.PENDING,
+        paymentMethod: 'flitt'
+      },
+      relations: ['user'],
+      order: { createdAt: 'DESC' }
+    });
+
+    res.json({
+      success: true,
+      count: pendingTransactions.length,
+      transactions: pendingTransactions.map(tx => ({
+        uuid: tx.uuid,
+        externalTransactionId: tx.externalTransactionId,
+        amount: tx.amount,
+        userId: tx.userId,
+        userName: tx.user?.fullName,
+        createdAt: tx.createdAt,
+        metadata: tx.metadata
+      }))
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Debug endpoint to check Flitt transaction status by order ID
+router.get('/flitt/debug/transaction/:orderId', async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+
+    const transaction = await transactionRepository.findOne({
+      where: { externalTransactionId: orderId },
+      relations: ['user']
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      transaction: {
+        uuid: transaction.uuid,
+        externalTransactionId: transaction.externalTransactionId,
+        status: transaction.status,
+        amount: parseFloat(transaction.amount.toString()),
+        balanceBefore: transaction.balanceBefore ? parseFloat(transaction.balanceBefore.toString()) : null,
+        balanceAfter: transaction.balanceAfter ? parseFloat(transaction.balanceAfter.toString()) : null,
+        userId: transaction.userId,
+        userName: transaction.user?.fullName,
+        userCurrentBalance: transaction.user ? parseFloat(transaction.user.balance.toString()) : null,
+        createdAt: transaction.createdAt,
+        metadata: transaction.metadata,
+        paymentMethod: transaction.paymentMethod
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Enhanced BOG callback with comprehensive debugging
 router.post('/bog/callback', (req: Request, res: Response, next: any) => {
   const timestamp = new Date().toISOString();
@@ -248,7 +452,7 @@ router.post('/bog/test-return-from-payment/:userId', async (req: Request, res: R
       order: { createdAt: 'DESC' }
     });
     
-    console.log(`📋 Found ${recentPendingTransactions.length} recent pending BOG transactions for user ${userId}`);
+    console.log(`📋 Found ${recentPendingTransactions.length} recent pending transactions for user ${userId}`);
     
     if (recentPendingTransactions.length === 0) {
       return res.json({
@@ -984,29 +1188,28 @@ router.post('/verify-payment-aggressive/:transactionId', async (req: Authenticat
   }
 });
 
-// Endpoint to call when user returns from BOG payment (immediate verification)
+// Endpoint to call when user returns from payment (immediate verification)
 router.post('/check-recent-payments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.id;
-    
+
     console.log(`🔍 User ${userId} returned from payment - checking recent transactions`);
-    
+
     // First get any recent pending transactions for this user (last 10 minutes)
     const transactionRepository = AppDataSource.getRepository(Transaction);
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    
+
     const recentPendingTransactions = await transactionRepository.find({
       where: {
         userId: userId,
         type: TransactionTypeEnum.TOP_UP,
         status: TransactionStatusEnum.PENDING,
-        paymentMethod: 'bog',
         createdAt: MoreThan(tenMinutesAgo)
       },
       order: { createdAt: 'DESC' }
     });
     
-    console.log(`📋 Found ${recentPendingTransactions.length} recent pending BOG transactions for user ${userId}`);
+    console.log(`📋 Found ${recentPendingTransactions.length} recent pending transactions for user ${userId}`);
     
     if (recentPendingTransactions.length === 0) {
       // Get current balance anyway
@@ -1032,9 +1235,54 @@ router.post('/check-recent-payments', async (req: AuthenticatedRequest, res: Res
       return;
     }
     
-    // Trigger immediate verification for this user
-    console.log(`🚀 Triggering verification for ${recentPendingTransactions.length} recent transactions`);
-    const results = await verifyUserPendingPayments(userId);
+    // Check for different payment methods and handle appropriately
+    const flittTransactions = recentPendingTransactions.filter(tx => tx.paymentMethod === 'flitt');
+    const bogTransactions = recentPendingTransactions.filter(tx => tx.paymentMethod === 'bog');
+
+    console.log(`🚀 Found ${flittTransactions.length} Flitt and ${bogTransactions.length} BOG pending transactions`);
+
+    let results = [];
+
+    // For BOG transactions, trigger verification (requires API calls)
+    if (bogTransactions.length > 0) {
+      console.log(`🔄 Triggering BOG verification for ${bogTransactions.length} transactions`);
+      results = await verifyUserPendingPayments(userId);
+    }
+
+    // For Flitt transactions, check if they were already completed by callback
+    for (const flittTx of flittTransactions) {
+      // Refresh transaction from database to see if callback already processed it
+      const transactionRepository = AppDataSource.getRepository(Transaction);
+      const updatedTx = await transactionRepository.findOne({
+        where: { uuid: flittTx.uuid }
+      });
+
+      if (updatedTx) {
+        if (updatedTx.status === TransactionStatusEnum.COMPLETED) {
+          results.push({
+            transactionId: updatedTx.uuid,
+            status: 'completed',
+            message: 'Flitt payment completed via callback',
+            balanceUpdate: {
+              added: parseFloat(updatedTx.amount.toString()),
+              newBalance: updatedTx.balanceAfter ? parseFloat(updatedTx.balanceAfter.toString()) : null
+            }
+          });
+        } else if (updatedTx.status === TransactionStatusEnum.FAILED) {
+          results.push({
+            transactionId: updatedTx.uuid,
+            status: 'failed',
+            message: 'Flitt payment failed'
+          });
+        } else {
+          results.push({
+            transactionId: updatedTx.uuid,
+            status: 'pending',
+            message: 'Flitt payment still pending (callback not yet received)'
+          });
+        }
+      }
+    }
     
     // Check if any payments were completed
     const completed = results.filter(r => r.status === 'completed');
