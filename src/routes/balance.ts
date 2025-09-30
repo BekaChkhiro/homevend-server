@@ -7,7 +7,8 @@ import {
   getDetailedTransactions,
   getTransactionSummary as getTransactionStats,
   getPaymentProviders,
-  initiateTopUp
+  initiateTopUp,
+  getPendingPayments
 } from '../controllers/balanceController.js';
 import { handleFlittCallback } from '../controllers/flittWebhookController.js';
 import { handleBogCallback, handleBogPaymentDetails } from '../controllers/bogWebhookController.js';
@@ -1628,6 +1629,9 @@ router.get('/payment-status/:transactionId', async (req: AuthenticatedRequest, r
 
 // Get user balance and recent transactions
 router.get('/', getUserBalance);
+
+// Get pending payments for user
+router.get('/pending-payments', getPendingPayments);
 
 // Get available payment providers
 router.get('/providers', getPaymentProviders);

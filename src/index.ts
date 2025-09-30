@@ -70,24 +70,68 @@ app.get('/health', (req, res) => {
 });
 
 
-// Flitt success handler - Flitt uses 302 redirect (GET request)
-app.get('/api/flitt-success', (req, res) => {
+// Flitt success handler - Handle both GET and POST requests
+const handleFlittSuccess = (req, res) => {
   try {
     console.log('🎉🎉🎉 FLITT SUCCESS ROUTE HIT! 🎉🎉🎉');
     console.log('Method:', req.method);
     console.log('Query params:', JSON.stringify(req.query, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
 
-    // Immediately redirect to React app
-    console.log('📤 Redirecting to React app...');
-    res.redirect(302, '/en/dashboard/balance?payment=success');
-    console.log('✅ Redirect sent successfully');
+    // For POST requests, send HTML that redirects
+    if (req.method === 'POST') {
+      console.log('📤 POST request - sending redirect HTML...');
+      res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Payment Processing...</title>
+          <meta charset="UTF-8">
+        </head>
+        <body>
+          <script>
+            console.log('Flitt payment success - redirecting...');
+            window.location.href = '/en/dashboard/balance?payment=success';
+          </script>
+          <p>Payment successful! Redirecting...</p>
+        </body>
+        </html>
+      `);
+    } else {
+      // For GET requests, use 302 redirect
+      console.log('📤 GET request - redirecting to React app...');
+      res.redirect(302, '/en/dashboard/balance?payment=success');
+    }
+
+    console.log('✅ Response sent successfully');
 
   } catch (error) {
     console.error('❌ Error in flitt-success route:', error);
-    res.redirect(302, '/en/dashboard/balance?payment=failed');
+    if (req.method === 'POST') {
+      res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Payment Error</title>
+          <meta charset="UTF-8">
+        </head>
+        <body>
+          <script>
+            window.location.href = '/en/dashboard/balance?payment=failed';
+          </script>
+          <p>Payment failed. Redirecting...</p>
+        </body>
+        </html>
+      `);
+    } else {
+      res.redirect(302, '/en/dashboard/balance?payment=failed');
+    }
   }
-});
+};
+
+app.get('/api/flitt-success', handleFlittSuccess);
+app.post('/api/flitt-success', handleFlittSuccess);
 
 // Test endpoint to verify the route works
 app.get('/api/test-flitt', (req, res) => {
