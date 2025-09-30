@@ -213,7 +213,7 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
-          responseUrl: `${baseUrl}/en/dashboard/balance?payment=success`
+          responseUrl: `${baseUrl}/flitt-success`
         });
 
         const orderResult = await flittService.createOrder({
@@ -221,7 +221,7 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
-          responseUrl: `${baseUrl}/en/dashboard/balance?payment=success`
+          responseUrl: `${baseUrl}/flitt-success`
         });
 
         console.log('🔄 Flitt order result:', orderResult);
