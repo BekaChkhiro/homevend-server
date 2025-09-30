@@ -79,53 +79,71 @@ const handleFlittSuccess = (req, res) => {
     console.log('Body:', JSON.stringify(req.body, null, 2));
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
 
-    // For POST requests, send HTML that redirects
+    // Determine the correct client URL based on environment
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
+    const redirectUrl = `${clientUrl}/en/dashboard/balance?payment=success`;
+
+    // For POST requests, return 200 OK with HTML redirect (Flitt expects 200 status)
     if (req.method === 'POST') {
-      console.log('📤 POST request - sending redirect HTML...');
+      console.log('📤 POST request - sending 200 OK with HTML redirect to:', redirectUrl);
       res.status(200).send(`
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Payment Processing...</title>
+          <title>Payment Successful - Redirecting...</title>
           <meta charset="UTF-8">
+          <meta http-equiv="refresh" content="0;url=${redirectUrl}">
         </head>
         <body>
           <script>
-            console.log('Flitt payment success - redirecting...');
-            window.location.href = '/en/dashboard/balance?payment=success';
+            console.log('Flitt payment success - redirecting with GET...');
+            window.location.href = '${redirectUrl}';
           </script>
-          <p>Payment successful! Redirecting...</p>
+          <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+            <h2>✅ Payment Successful!</h2>
+            <p>Redirecting to your dashboard...</p>
+            <p><a href="${redirectUrl}">Click here if you're not redirected automatically</a></p>
+          </div>
         </body>
         </html>
       `);
     } else {
       // For GET requests, use 302 redirect
-      console.log('📤 GET request - redirecting to React app...');
-      res.redirect(302, '/en/dashboard/balance?payment=success');
+      console.log('📤 GET request - redirecting to:', redirectUrl);
+      res.redirect(302, redirectUrl);
     }
 
     console.log('✅ Response sent successfully');
 
   } catch (error) {
     console.error('❌ Error in flitt-success route:', error);
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
+    const failedRedirectUrl = `${clientUrl}/en/dashboard/balance?payment=failed`;
+
     if (req.method === 'POST') {
       res.status(200).send(`
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Payment Error</title>
+          <title>Payment Error - Redirecting...</title>
           <meta charset="UTF-8">
+          <meta http-equiv="refresh" content="0;url=${failedRedirectUrl}">
         </head>
         <body>
           <script>
-            window.location.href = '/en/dashboard/balance?payment=failed';
+            console.log('Flitt payment error - redirecting...');
+            window.location.href = '${failedRedirectUrl}';
           </script>
-          <p>Payment failed. Redirecting...</p>
+          <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+            <h2>❌ Payment Error</h2>
+            <p>Redirecting to your dashboard...</p>
+            <p><a href="${failedRedirectUrl}">Click here if you're not redirected automatically</a></p>
+          </div>
         </body>
         </html>
       `);
     } else {
-      res.redirect(302, '/en/dashboard/balance?payment=failed');
+      res.redirect(302, failedRedirectUrl);
     }
   }
 };
