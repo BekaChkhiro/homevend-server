@@ -24,7 +24,8 @@ import { flittScheduler } from '../services/FlittScheduler.js';
 const router = Router();
 
 // Webhook endpoints (no authentication required)
-router.post('/flitt/callback', handleFlittCallback);
+router.all('/flitt/callback', handleFlittCallback); // Handle both POST (webhook) and GET (redirect)
+
 
 // Flitt test endpoints for debugging
 router.post('/flitt/test-callback', async (req: Request, res: Response) => {
