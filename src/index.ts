@@ -69,6 +69,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Flitt payment success redirect handler
+app.all('/flitt-success', (req, res) => {
+  console.log('🎉 Flitt success redirect received!');
+  console.log('Method:', req.method);
+  console.log('Query params:', req.query);
+  console.log('Body params:', req.body);
+  console.log('All parameters:', { ...req.query, ...req.body });
+
+  // Redirect to React app with simple success parameter
+  res.redirect(302, '/en/dashboard/balance?payment=success');
+});
+
 // API routes
 app.use('/api', routes);
 
