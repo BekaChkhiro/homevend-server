@@ -78,8 +78,27 @@ app.all('/api/flitt-success', (req, res) => {
   console.log('Body:', req.body);
   console.log('Query:', req.query);
 
-  // Instead of serving HTML, do a server-side redirect to force GET request
-  res.redirect(302, '/en/dashboard/balance?payment=success');
+  // Send HTML that immediately redirects with GET request
+  res.type('html').send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Payment Successful</title>
+      <meta http-equiv="refresh" content="0;url=/en/dashboard/balance?payment=success">
+    </head>
+    <body>
+      <h1>Payment Successful!</h1>
+      <p>Redirecting...</p>
+      <script>
+        // Force immediate GET redirect
+        window.location.replace('/en/dashboard/balance?payment=success');
+      </script>
+      <noscript>
+        <a href="/en/dashboard/balance?payment=success">Click here if not redirected</a>
+      </noscript>
+    </body>
+    </html>
+  `);
 });
 
 // API routes
