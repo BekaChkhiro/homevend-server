@@ -77,6 +77,46 @@ export const getUserBalance = async (req: AuthenticatedRequest, res: Response): 
   }
 };
 
+// Get pending payments for user
+export const getPendingPayments = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+
+    // Get pending transactions for the user
+    const pendingTransactions = await transactionRepository.find({
+      where: {
+        userId: userId,
+        status: TransactionStatusEnum.PENDING,
+        type: TransactionTypeEnum.TOP_UP
+      },
+      order: { createdAt: 'DESC' },
+      select: [
+        'id', 'uuid', 'status', 'paymentMethod', 'amount', 'createdAt'
+      ]
+    });
+
+    const pendingPayments = pendingTransactions.map(tx => ({
+      id: tx.uuid,
+      status: tx.status,
+      paymentMethod: tx.paymentMethod,
+      amount: parseFloat(tx.amount.toString()),
+      createdAt: tx.createdAt.toISOString()
+    }));
+
+    res.status(200).json({
+      success: true,
+      pendingPayments
+    });
+  } catch (error) {
+    console.error('Get pending payments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch pending payments'
+    });
+  }
+};
+
 // Get available payment providers
 export const getPaymentProviders = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
