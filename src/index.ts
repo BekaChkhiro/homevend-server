@@ -72,6 +72,20 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api', routes);
 
+// Serve frontend build files (IMPORTANT: Add AFTER API routes)
+if (process.env.NODE_ENV === 'production') {
+  const path = require('path');
+
+  // Serve static files from React build
+  app.use(express.static(path.join(__dirname, '../../client/build')));
+
+  // Handle React Router - send all non-API requests to React app
+  app.get('*', (req, res) => {
+    console.log(`🔀 Serving React app for path: ${req.path}`);
+    res.sendFile(path.join(__dirname, '../../client/build', 'index.html'));
+  });
+}
+
 // Error handling middleware
 app.use(notFound);
 app.use(errorHandler);
