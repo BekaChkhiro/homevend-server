@@ -72,33 +72,46 @@ app.get('/health', (req, res) => {
 
 // Flitt success handler - must handle POST requests from Flitt
 app.all('/api/flitt-success', (req, res) => {
-  console.log('🎉 Flitt redirect received!');
-  console.log('Method:', req.method);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
-  console.log('Query:', req.query);
+  try {
+    console.log('🎉🎉🎉 FLITT SUCCESS ROUTE HIT! 🎉🎉🎉');
+    console.log('Method:', req.method);
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    console.log('Query:', JSON.stringify(req.query, null, 2));
+    console.log('URL:', req.url);
+    console.log('Original URL:', req.originalUrl);
 
-  // Send HTML that immediately redirects with GET request
-  res.type('html').send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Payment Successful</title>
-      <meta http-equiv="refresh" content="0;url=/en/dashboard/balance?payment=success">
-    </head>
-    <body>
-      <h1>Payment Successful!</h1>
-      <p>Redirecting...</p>
-      <script>
-        // Force immediate GET redirect
-        window.location.replace('/en/dashboard/balance?payment=success');
-      </script>
-      <noscript>
-        <a href="/en/dashboard/balance?payment=success">Click here if not redirected</a>
-      </noscript>
-    </body>
-    </html>
-  `);
+    // Set headers explicitly
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Payment Successful</title>
+  <meta http-equiv="refresh" content="0;url=/en/dashboard/balance?payment=success">
+</head>
+<body>
+  <h1>Payment Successful!</h1>
+  <p>Redirecting...</p>
+  <script>
+    console.log('Redirecting from Flitt success page...');
+    window.location.replace('/en/dashboard/balance?payment=success');
+  </script>
+  <noscript>
+    <a href="/en/dashboard/balance?payment=success">Click here if not redirected</a>
+  </noscript>
+</body>
+</html>`;
+
+    console.log('📤 Sending HTML response, length:', html.length);
+    res.status(200).send(html);
+    console.log('✅ Response sent successfully');
+
+  } catch (error) {
+    console.error('❌ Error in flitt-success route:', error);
+    res.status(500).send('Error processing payment redirect');
+  }
 });
 
 // API routes
