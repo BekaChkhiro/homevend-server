@@ -70,7 +70,7 @@ app.get('/health', (req, res) => {
 });
 
 
-// Flitt success handler - Receives POST from Flitt and redirects user browser
+// Flitt success handler - Receives POST from Flitt iframe and redirects parent window
 const handleFlittSuccess = (req, res) => {
   try {
     console.log('🎉🎉🎉 FLITT SUCCESS ROUTE HIT! 🎉🎉🎉');
@@ -96,24 +96,63 @@ const handleFlittSuccess = (req, res) => {
     console.log('📤 Payment ID:', payment_id);
     console.log('📤 Redirecting user to:', redirectUrl);
 
-    // For POST requests after payment, use 303 See Other redirect
-    // 303 tells the browser to redirect using GET method (standard for POST-Redirect-GET pattern)
-    if (req.method === 'POST') {
-      console.log('📤 Using 303 See Other redirect (POST-Redirect-GET pattern)');
-      return res.redirect(303, redirectUrl);
-    }
+    // Flitt POSTs inside an iframe (frame: true in payload)
+    // We need to break out of the iframe and redirect the parent window
+    // HTTP redirects won't work from iframe, must use JavaScript
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Payment ${isSuccess ? 'Successful' : 'Failed'} - Redirecting...</title>
+      </head>
+      <body>
+        <script>
+          // Break out of iframe and redirect parent window (top window)
+          if (window.top) {
+            window.top.location.href = '${redirectUrl}';
+          } else {
+            window.location.href = '${redirectUrl}';
+          }
+        </script>
+        <noscript>
+          <p>Payment ${isSuccess ? 'successful' : 'failed'}. <a href="${redirectUrl}">Click here to continue</a></p>
+        </noscript>
+      </body>
+      </html>
+    `;
 
-    // For GET requests, use standard 302 redirect
-    console.log('📤 Using 302 redirect for GET request');
-    return res.redirect(302, redirectUrl);
+    console.log('✅ Sending HTML response with parent window redirect');
+    return res.status(200).type('text/html').send(html);
 
   } catch (error) {
     console.error('❌ Error in flitt-success route:', error);
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
     const failedRedirectUrl = `${clientUrl}/en/dashboard/balance?payment=error`;
 
-    // Use 303 redirect even for errors
-    return res.redirect(303, failedRedirectUrl);
+    const errorHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Error - Redirecting...</title>
+      </head>
+      <body>
+        <script>
+          if (window.top) {
+            window.top.location.href = '${failedRedirectUrl}';
+          } else {
+            window.location.href = '${failedRedirectUrl}';
+          }
+        </script>
+        <noscript>
+          <p>An error occurred. <a href="${failedRedirectUrl}">Click here to continue</a></p>
+        </noscript>
+      </body>
+      </html>
+    `;
+
+    return res.status(200).type('text/html').send(errorHtml);
   }
 };
 
