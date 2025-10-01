@@ -85,35 +85,10 @@ app.get('/health', (req, res) => {
 
 // Flitt success handler - Receives POST from Flitt and redirects user
 const handleFlittSuccess = (req, res) => {
-  // Log IMMEDIATELY when function is called
-  console.log('');
-  console.log('🚨'.repeat(40));
-  console.log('⚡ FLITT SUCCESS HANDLER FUNCTION CALLED ⚡');
-  console.log('🚨'.repeat(40));
-
   try {
-    console.log('⏰ Timestamp:', new Date().toISOString());
-    console.log('🔧 Method:', req.method);
-    console.log('🔗 Full URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
-    console.log('📍 Path:', req.path);
-    console.log('❓ Query params:', JSON.stringify(req.query, null, 2));
-    console.log('📦 Body exists?', !!req.body);
-    console.log('📦 Body type:', typeof req.body);
-    console.log('📦 Body keys:', Object.keys(req.body || {}));
-    console.log('📦 Body:', JSON.stringify(req.body, null, 2));
-    console.log('🌐 Origin:', req.headers.origin);
-    console.log('🔐 Content-Type:', req.headers['content-type']);
-    console.log('='.repeat(80));
-
     // Extract payment status from either POST body or GET query params
     const paymentData = req.method === 'POST' ? req.body : req.query;
-    const { order_status, response_status, order_id, payment_id } = paymentData;
-
-    console.log('💳 Payment data source:', req.method === 'POST' ? 'POST body' : 'GET query params');
-    console.log('💳 Extracted - order_status:', order_status);
-    console.log('💳 Extracted - response_status:', response_status);
-    console.log('💳 Extracted - order_id:', order_id);
-    console.log('💳 Extracted - payment_id:', payment_id);
+    const { order_status, response_status, order_id } = paymentData;
 
     // Determine the correct client URL based on environment
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
@@ -124,85 +99,21 @@ const handleFlittSuccess = (req, res) => {
       ? `${clientUrl}/en/dashboard/balance?payment=success&orderId=${order_id}`
       : `${clientUrl}/en/dashboard/balance?payment=failed&orderId=${order_id}`;
 
-    console.log('📤 Flitt request received - payment status:', isSuccess ? 'SUCCESS' : 'FAILED');
-    console.log('📤 Order ID:', order_id);
-    console.log('📤 Payment ID:', payment_id);
-    console.log('📤 Redirecting user to:', redirectUrl);
+    console.log(`Flitt payment ${isSuccess ? 'success' : 'failed'} - redirecting to dashboard (Order: ${order_id})`);
 
-    // For POST requests: Use HTTP 303 "See Other" redirect
-    // This tells the browser to make a GET request to the redirect URL
-    // This is the standard POST-Redirect-GET pattern
-    if (req.method === 'POST') {
-      console.log('📤 Using HTTP 303 See Other redirect (POST -> GET)');
-      res.redirect(303, redirectUrl);
-      console.log('✅ 303 redirect sent!');
-    } else {
-      // For GET requests: Use standard 302 redirect
-      console.log('📤 Using HTTP 302 redirect for GET request');
-      res.redirect(302, redirectUrl);
-      console.log('✅ 302 redirect sent!');
-    }
-
-    console.log('='.repeat(80));
-    console.log('');
+    // Use HTTP 303 redirect for POST (converts to GET)
+    res.redirect(req.method === 'POST' ? 303 : 302, redirectUrl);
 
   } catch (error) {
-    console.error('❌ Error in flitt-success route:', error);
+    console.error('Error in flitt-success route:', error);
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
     const failedRedirectUrl = `${clientUrl}/en/dashboard/balance?payment=error`;
-
-    const errorHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Error - Redirecting...</title>
-        <meta http-equiv="refresh" content="0;url=${failedRedirectUrl}">
-      </head>
-      <body>
-        <script>
-          try {
-            if (window.top) window.top.location.href = '${failedRedirectUrl}';
-            else window.location.href = '${failedRedirectUrl}';
-          } catch(e) {
-            window.location.replace('${failedRedirectUrl}');
-          }
-        </script>
-        <p>An error occurred. <a href="${failedRedirectUrl}" target="_top">Click here to continue</a></p>
-      </body>
-      </html>
-    `;
-
-    return res.status(200).type('text/html').send(errorHtml);
+    res.redirect(303, failedRedirectUrl);
   }
 };
 
 app.get('/api/flitt-success', handleFlittSuccess);
 app.post('/api/flitt-success', handleFlittSuccess);
-app.options('/api/flitt-success', (req, res) => {
-  console.log('⚙️ OPTIONS request received for /api/flitt-success');
-  res.status(200).end();
-});
-
-// Simple test endpoint that always returns HTML (to verify routing works)
-app.all('/api/flitt-test', (req, res) => {
-  console.log('🧪 TEST ENDPOINT HIT - Method:', req.method);
-  res.status(200).type('text/html').send(`
-    <!DOCTYPE html>
-    <html><head><title>Test</title></head>
-    <body>
-      <h1>Test endpoint works!</h1>
-      <p>Method: ${req.method}</p>
-      <p>Time: ${new Date().toISOString()}</p>
-    </body></html>
-  `);
-});
-
-// Test endpoint to verify the route works
-app.get('/api/test-flitt', (req, res) => {
-  console.log('🧪 Test route hit');
-  res.json({ message: 'Flitt route is working!', timestamp: new Date().toISOString() });
-});
 
 // API routes
 app.use('/api', routes);
