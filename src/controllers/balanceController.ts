@@ -246,17 +246,20 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
       try {
         console.log('🔄 Creating Flitt payment service...');
         const flittService = new FlittPaymentService();
-        const baseUrl = process.env.BASE_URL || 'https://homevend.ge';
-        
-        // Flitt POSTs payment data to response_url, so it must be a backend endpoint
-        // that receives the POST and redirects the user to the frontend dashboard
-        const flittResponseHandler = `${baseUrl}/api/flitt-success`;
+
+        // IMPORTANT: Backend is hosted on Render at homevend-server.onrender.com
+        // Frontend is at homevend.ge
+        const backendUrl = process.env.BACKEND_URL || 'https://homevend-server.onrender.com';
+
+        // Flitt POSTs payment data to response_url, so it MUST point to the backend server
+        const flittResponseHandler = `${backendUrl}/api/flitt-success`;
+        const flittCallbackUrl = `${backendUrl}/api/balance/flitt/callback`;
 
         console.log('🔄 Creating Flitt order with params:', {
           orderId: orderId,
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
-          callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
+          callbackUrl: flittCallbackUrl,
           responseUrl: flittResponseHandler
         });
 
@@ -264,7 +267,7 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           orderId: orderId,
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
-          callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
+          callbackUrl: flittCallbackUrl,
           responseUrl: flittResponseHandler
         });
 

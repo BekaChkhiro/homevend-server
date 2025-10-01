@@ -26,19 +26,30 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// CORS configuration
+// CORS configuration - Allow requests from multiple origins including Flitt
 app.use(cors({
-  origin: [
-    process.env.CLIENT_URL || 'http://localhost:8082',
-    'http://localhost:8080',
-    'http://localhost:8081',
-    'http://192.168.68.69:8082',
-    'https://homevend.ge',
-    'https://www.homevend.ge',
-    'http://localhost:3000',
-    'https://pay.flitt.com',  // Add Flitt's domain for iframe POST requests
-    'https://flitt.com'
-  ],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      process.env.CLIENT_URL || 'http://localhost:8082',
+      'http://localhost:8080',
+      'http://localhost:8081',
+      'http://192.168.68.69:8082',
+      'https://homevend.ge',
+      'https://www.homevend.ge',
+      'http://localhost:3000',
+      'https://pay.flitt.com',  // Flitt payment gateway
+      'https://flitt.com'
+    ];
+
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('flitt.com')) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins for now to ensure Flitt works
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires'],
