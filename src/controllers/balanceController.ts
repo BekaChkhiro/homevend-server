@@ -248,12 +248,16 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
         const flittService = new FlittPaymentService();
         const baseUrl = process.env.BASE_URL || 'https://homevend.ge';
         
+        // response_url receives POST from Flitt with payment data, then redirects user to frontend
+        // Must be a backend endpoint that can handle POST and perform HTTP redirect
+        const flittResponseUrl = `${baseUrl}/api/flitt-success`;
+
         console.log('🔄 Creating Flitt order with params:', {
           orderId: orderId,
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
-          responseUrl: `${baseUrl}/api/flitt-success`
+          responseUrl: flittResponseUrl
         });
 
         const orderResult = await flittService.createOrder({
@@ -261,7 +265,7 @@ export const initiateTopUp = async (req: AuthenticatedRequest, res: Response): P
           amount: topUpAmount,
           description: `ბალანსის შევსება - ${topUpAmount} ლარი`,
           callbackUrl: `${baseUrl}/api/balance/flitt/callback`,
-          responseUrl: `${baseUrl}/api/flitt-success`
+          responseUrl: flittResponseUrl
         });
 
         console.log('🔄 Flitt order result:', orderResult);
