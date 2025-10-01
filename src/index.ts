@@ -96,33 +96,73 @@ const handleFlittSuccess = (req, res) => {
     console.log('📤 Payment ID:', payment_id);
     console.log('📤 Redirecting user to:', redirectUrl);
 
-    // Flitt POSTs inside an iframe (frame: true in payload)
-    // We need to break out of the iframe and redirect the parent window
-    // HTTP redirects won't work from iframe, must use JavaScript
+    // Flitt POSTs inside an iframe with target="_top" in payload
+    // Use multiple methods to ensure redirect works across different scenarios
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Payment ${isSuccess ? 'Successful' : 'Failed'} - Redirecting...</title>
+        <title>Payment Processing - Redirecting...</title>
+        <meta http-equiv="refresh" content="0;url=${redirectUrl}">
       </head>
       <body>
-        <script>
-          // Break out of iframe and redirect parent window (top window)
-          if (window.top) {
-            window.top.location.href = '${redirectUrl}';
-          } else {
-            window.location.href = '${redirectUrl}';
-          }
+        <script type="text/javascript">
+          // Try multiple methods to break out of iframe
+          (function() {
+            var redirectUrl = '${redirectUrl}';
+
+            try {
+              // Method 1: Try to redirect top window
+              if (window.top && window.top !== window.self) {
+                window.top.location.href = redirectUrl;
+              } else {
+                // Method 2: Regular redirect if not in iframe
+                window.location.href = redirectUrl;
+              }
+            } catch (e) {
+              console.log('Top redirect blocked, trying parent');
+              try {
+                // Method 3: Try parent window if top is blocked
+                if (window.parent && window.parent !== window.self) {
+                  window.parent.location.href = redirectUrl;
+                } else {
+                  window.location.href = redirectUrl;
+                }
+              } catch (e2) {
+                console.log('Parent redirect also blocked, using location.replace');
+                // Method 4: Last resort - replace current location
+                window.location.replace(redirectUrl);
+              }
+            }
+          })();
         </script>
-        <noscript>
-          <p>Payment ${isSuccess ? 'successful' : 'failed'}. <a href="${redirectUrl}">Click here to continue</a></p>
-        </noscript>
+        <form id="redirectForm" action="${redirectUrl}" method="GET" target="_top">
+          <noscript>
+            <p>Payment ${isSuccess ? 'successful' : 'failed'}.</p>
+            <p><button type="submit">Click here to continue</button></p>
+          </noscript>
+        </form>
+        <script type="text/javascript">
+          // Method 5: Auto-submit form with target="_top" as fallback
+          setTimeout(function() {
+            document.getElementById('redirectForm').submit();
+          }, 100);
+        </script>
       </body>
       </html>
     `;
 
-    console.log('✅ Sending HTML response with parent window redirect');
+    console.log('✅ Sending HTML response with multiple redirect methods');
+
+    // Set headers to prevent caching
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'X-Frame-Options': 'ALLOWALL'
+    });
+
     return res.status(200).type('text/html').send(html);
 
   } catch (error) {
@@ -136,18 +176,18 @@ const handleFlittSuccess = (req, res) => {
       <head>
         <meta charset="UTF-8">
         <title>Error - Redirecting...</title>
+        <meta http-equiv="refresh" content="0;url=${failedRedirectUrl}">
       </head>
       <body>
         <script>
-          if (window.top) {
-            window.top.location.href = '${failedRedirectUrl}';
-          } else {
-            window.location.href = '${failedRedirectUrl}';
+          try {
+            if (window.top) window.top.location.href = '${failedRedirectUrl}';
+            else window.location.href = '${failedRedirectUrl}';
+          } catch(e) {
+            window.location.replace('${failedRedirectUrl}');
           }
         </script>
-        <noscript>
-          <p>An error occurred. <a href="${failedRedirectUrl}">Click here to continue</a></p>
-        </noscript>
+        <p>An error occurred. <a href="${failedRedirectUrl}" target="_top">Click here to continue</a></p>
       </body>
       </html>
     `;
