@@ -35,7 +35,9 @@ app.use(cors({
     'http://192.168.68.69:8082',
     'https://homevend.ge',
     'https://www.homevend.ge',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'https://pay.flitt.com',  // Add Flitt's domain for iframe POST requests
+    'https://flitt.com'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -70,17 +72,32 @@ app.get('/health', (req, res) => {
 });
 
 
-// Flitt success handler - Receives POST from Flitt iframe and redirects parent window
+// Flitt success handler - Receives request from Flitt and redirects user
 const handleFlittSuccess = (req, res) => {
   try {
+    console.log('');
+    console.log('='.repeat(80));
     console.log('🎉🎉🎉 FLITT SUCCESS ROUTE HIT! 🎉🎉🎉');
-    console.log('Method:', req.method);
-    console.log('Query params:', JSON.stringify(req.query, null, 2));
-    console.log('Body:', JSON.stringify(req.body, null, 2));
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('='.repeat(80));
+    console.log('⏰ Timestamp:', new Date().toISOString());
+    console.log('🔧 Method:', req.method);
+    console.log('🔗 URL:', req.url);
+    console.log('📍 Path:', req.path);
+    console.log('❓ Query params:', JSON.stringify(req.query, null, 2));
+    console.log('📦 Body type:', typeof req.body);
+    console.log('📦 Body is empty?', Object.keys(req.body || {}).length === 0);
+    console.log('📦 Body:', JSON.stringify(req.body, null, 2));
+    console.log('📨 Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('🌐 Origin:', req.headers.origin);
+    console.log('🔐 Content-Type:', req.headers['content-type']);
+    console.log('='.repeat(80));
 
-    // Extract payment status from POST body
-    const { order_status, response_status, order_id, payment_id } = req.body;
+    // Extract payment status from either POST body or GET query params
+    const paymentData = req.method === 'POST' ? req.body : req.query;
+    const { order_status, response_status, order_id, payment_id } = paymentData;
+
+    console.log('💳 Payment data source:', req.method === 'POST' ? 'POST body' : 'GET query params');
+    console.log('💳 Payment status:', order_status, response_status);
 
     // Determine the correct client URL based on environment
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
@@ -154,16 +171,27 @@ const handleFlittSuccess = (req, res) => {
     `;
 
     console.log('✅ Sending HTML response with multiple redirect methods');
+    console.log('📄 HTML length:', html.length, 'characters');
+    console.log('🎯 Redirect URL:', redirectUrl);
 
     // Set headers to prevent caching
     res.set({
       'Cache-Control': 'no-store, no-cache, must-revalidate, private',
       'Pragma': 'no-cache',
       'Expires': '0',
-      'X-Frame-Options': 'ALLOWALL'
+      'X-Frame-Options': 'ALLOWALL',
+      'Content-Type': 'text/html; charset=utf-8'
     });
 
-    return res.status(200).type('text/html').send(html);
+    console.log('📤 Response status: 200');
+    console.log('📤 Response headers set');
+    console.log('📤 About to send HTML...');
+
+    res.status(200).send(html);
+
+    console.log('✅ HTML sent successfully!');
+    console.log('='.repeat(80));
+    console.log('');
 
   } catch (error) {
     console.error('❌ Error in flitt-success route:', error);
@@ -198,6 +226,24 @@ const handleFlittSuccess = (req, res) => {
 
 app.get('/api/flitt-success', handleFlittSuccess);
 app.post('/api/flitt-success', handleFlittSuccess);
+app.options('/api/flitt-success', (req, res) => {
+  console.log('⚙️ OPTIONS request received for /api/flitt-success');
+  res.status(200).end();
+});
+
+// Simple test endpoint that always returns HTML (to verify routing works)
+app.all('/api/flitt-test', (req, res) => {
+  console.log('🧪 TEST ENDPOINT HIT - Method:', req.method);
+  res.status(200).type('text/html').send(`
+    <!DOCTYPE html>
+    <html><head><title>Test</title></head>
+    <body>
+      <h1>Test endpoint works!</h1>
+      <p>Method: ${req.method}</p>
+      <p>Time: ${new Date().toISOString()}</p>
+    </body></html>
+  `);
+});
 
 // Test endpoint to verify the route works
 app.get('/api/test-flitt', (req, res) => {
