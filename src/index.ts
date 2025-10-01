@@ -72,22 +72,24 @@ app.get('/health', (req, res) => {
 });
 
 
-// Flitt success handler - Receives request from Flitt and redirects user
+// Flitt success handler - Receives POST from Flitt and redirects user
 const handleFlittSuccess = (req, res) => {
+  // Log IMMEDIATELY when function is called
+  console.log('');
+  console.log('🚨'.repeat(40));
+  console.log('⚡ FLITT SUCCESS HANDLER FUNCTION CALLED ⚡');
+  console.log('🚨'.repeat(40));
+
   try {
-    console.log('');
-    console.log('='.repeat(80));
-    console.log('🎉🎉🎉 FLITT SUCCESS ROUTE HIT! 🎉🎉🎉');
-    console.log('='.repeat(80));
     console.log('⏰ Timestamp:', new Date().toISOString());
     console.log('🔧 Method:', req.method);
-    console.log('🔗 URL:', req.url);
+    console.log('🔗 Full URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
     console.log('📍 Path:', req.path);
     console.log('❓ Query params:', JSON.stringify(req.query, null, 2));
+    console.log('📦 Body exists?', !!req.body);
     console.log('📦 Body type:', typeof req.body);
-    console.log('📦 Body is empty?', Object.keys(req.body || {}).length === 0);
+    console.log('📦 Body keys:', Object.keys(req.body || {}));
     console.log('📦 Body:', JSON.stringify(req.body, null, 2));
-    console.log('📨 Headers:', JSON.stringify(req.headers, null, 2));
     console.log('🌐 Origin:', req.headers.origin);
     console.log('🔐 Content-Type:', req.headers['content-type']);
     console.log('='.repeat(80));
@@ -97,7 +99,10 @@ const handleFlittSuccess = (req, res) => {
     const { order_status, response_status, order_id, payment_id } = paymentData;
 
     console.log('💳 Payment data source:', req.method === 'POST' ? 'POST body' : 'GET query params');
-    console.log('💳 Payment status:', order_status, response_status);
+    console.log('💳 Extracted - order_status:', order_status);
+    console.log('💳 Extracted - response_status:', response_status);
+    console.log('💳 Extracted - order_id:', order_id);
+    console.log('💳 Extracted - payment_id:', payment_id);
 
     // Determine the correct client URL based on environment
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
@@ -108,88 +113,25 @@ const handleFlittSuccess = (req, res) => {
       ? `${clientUrl}/en/dashboard/balance?payment=success&orderId=${order_id}`
       : `${clientUrl}/en/dashboard/balance?payment=failed&orderId=${order_id}`;
 
-    console.log('📤 Flitt POST received - payment status:', isSuccess ? 'SUCCESS' : 'FAILED');
+    console.log('📤 Flitt request received - payment status:', isSuccess ? 'SUCCESS' : 'FAILED');
     console.log('📤 Order ID:', order_id);
     console.log('📤 Payment ID:', payment_id);
     console.log('📤 Redirecting user to:', redirectUrl);
 
-    // Flitt POSTs inside an iframe with target="_top" in payload
-    // Use multiple methods to ensure redirect works across different scenarios
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Payment Processing - Redirecting...</title>
-        <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-      </head>
-      <body>
-        <script type="text/javascript">
-          // Try multiple methods to break out of iframe
-          (function() {
-            var redirectUrl = '${redirectUrl}';
+    // For POST requests: Use HTTP 303 "See Other" redirect
+    // This tells the browser to make a GET request to the redirect URL
+    // This is the standard POST-Redirect-GET pattern
+    if (req.method === 'POST') {
+      console.log('📤 Using HTTP 303 See Other redirect (POST -> GET)');
+      res.redirect(303, redirectUrl);
+      console.log('✅ 303 redirect sent!');
+    } else {
+      // For GET requests: Use standard 302 redirect
+      console.log('📤 Using HTTP 302 redirect for GET request');
+      res.redirect(302, redirectUrl);
+      console.log('✅ 302 redirect sent!');
+    }
 
-            try {
-              // Method 1: Try to redirect top window
-              if (window.top && window.top !== window.self) {
-                window.top.location.href = redirectUrl;
-              } else {
-                // Method 2: Regular redirect if not in iframe
-                window.location.href = redirectUrl;
-              }
-            } catch (e) {
-              console.log('Top redirect blocked, trying parent');
-              try {
-                // Method 3: Try parent window if top is blocked
-                if (window.parent && window.parent !== window.self) {
-                  window.parent.location.href = redirectUrl;
-                } else {
-                  window.location.href = redirectUrl;
-                }
-              } catch (e2) {
-                console.log('Parent redirect also blocked, using location.replace');
-                // Method 4: Last resort - replace current location
-                window.location.replace(redirectUrl);
-              }
-            }
-          })();
-        </script>
-        <form id="redirectForm" action="${redirectUrl}" method="GET" target="_top">
-          <noscript>
-            <p>Payment ${isSuccess ? 'successful' : 'failed'}.</p>
-            <p><button type="submit">Click here to continue</button></p>
-          </noscript>
-        </form>
-        <script type="text/javascript">
-          // Method 5: Auto-submit form with target="_top" as fallback
-          setTimeout(function() {
-            document.getElementById('redirectForm').submit();
-          }, 100);
-        </script>
-      </body>
-      </html>
-    `;
-
-    console.log('✅ Sending HTML response with multiple redirect methods');
-    console.log('📄 HTML length:', html.length, 'characters');
-    console.log('🎯 Redirect URL:', redirectUrl);
-
-    // Set headers to prevent caching
-    res.set({
-      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
-      'Pragma': 'no-cache',
-      'Expires': '0',
-      'X-Frame-Options': 'ALLOWALL',
-      'Content-Type': 'text/html; charset=utf-8'
-    });
-
-    console.log('📤 Response status: 200');
-    console.log('📤 Response headers set');
-    console.log('📤 About to send HTML...');
-
-    res.status(200).send(html);
-
-    console.log('✅ HTML sent successfully!');
     console.log('='.repeat(80));
     console.log('');
 
