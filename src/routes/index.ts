@@ -19,6 +19,7 @@ import autoRenewalRoutes from './autoRenewal.js';
 import serviceExpirationRoutes from './serviceExpiration.js';
 import uploadRoutes from './upload.js';
 import termsConditionsRoutes from './termsConditionsRoutes.js';
+import advertisementRoutes from './advertisements.js';
 
 const router = Router();
 
@@ -42,5 +43,6 @@ router.use('/auto-renewal', autoRenewalRoutes);
 router.use('/service-expiration', serviceExpirationRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/terms-conditions', termsConditionsRoutes);
+router.use('/advertisements', advertisementRoutes);
 
 export default router;
