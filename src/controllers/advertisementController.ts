@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database.js';
 import { Advertisement, AdStatus } from '../models/Advertisement.js';
-import { Image } from '../models/Image.js';
+import { Image, EntityType } from '../models/Image.js';
+import { AuthenticatedRequest } from '../middleware/auth.js';
 import { Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 
 const advertisementRepository = AppDataSource.getRepository(Advertisement);
 const imageRepository = AppDataSource.getRepository(Image);
 
 // Create new advertisement
-export const createAdvertisement = async (req: Request, res: Response) => {
+export const createAdvertisement = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const {
       title,
@@ -23,20 +24,22 @@ export const createAdvertisement = async (req: Request, res: Response) => {
 
     // Validation
     if (!title || !advertiser || !placementId || !startDate || !endDate || !imageUrl || !targetUrl) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'All required fields must be provided',
       });
+      return;
     }
 
     // Validate dates
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (start >= end) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'End date must be after start date',
       });
+      return;
     }
 
     // Determine status based on dates
@@ -78,7 +81,7 @@ export const createAdvertisement = async (req: Request, res: Response) => {
 };
 
 // Get all advertisements (admin)
-export const getAdvertisements = async (req: Request, res: Response) => {
+export const getAdvertisements = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { placementId, status, page = 1, limit = 50 } = req.query;
 
@@ -130,7 +133,7 @@ export const getAdvertisements = async (req: Request, res: Response) => {
 };
 
 // Get single advertisement
-export const getAdvertisementById = async (req: Request, res: Response) => {
+export const getAdvertisementById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -140,10 +143,11 @@ export const getAdvertisementById = async (req: Request, res: Response) => {
     });
 
     if (!advertisement) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Advertisement not found',
       });
+      return;
     }
 
     res.json({
@@ -160,7 +164,7 @@ export const getAdvertisementById = async (req: Request, res: Response) => {
 };
 
 // Get active advertisement for a placement (public endpoint)
-export const getActiveAdvertisementByPlacement = async (req: Request, res: Response) => {
+export const getActiveAdvertisementByPlacement = async (req: Request, res: Response): Promise<void> => {
   try {
     const { placementId } = req.params;
     const now = new Date();
@@ -177,16 +181,17 @@ export const getActiveAdvertisementByPlacement = async (req: Request, res: Respo
     });
 
     if (!advertisement) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'No active advertisement found for this placement',
       });
+      return;
     }
 
     // Fetch the image URL from the Image table
     const image = await imageRepository.findOne({
       where: {
-        entityType: 'advertisement',
+        entityType: EntityType.ADVERTISEMENT,
         entityId: advertisement.id,
         purpose: 'ad_banner',
       },
@@ -213,7 +218,7 @@ export const getActiveAdvertisementByPlacement = async (req: Request, res: Respo
 };
 
 // Update advertisement
-export const updateAdvertisement = async (req: Request, res: Response) => {
+export const updateAdvertisement = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const {
@@ -233,10 +238,11 @@ export const updateAdvertisement = async (req: Request, res: Response) => {
     });
 
     if (!advertisement) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Advertisement not found',
       });
+      return;
     }
 
     // Update fields
@@ -252,10 +258,11 @@ export const updateAdvertisement = async (req: Request, res: Response) => {
 
     // Validate dates if both are provided
     if (advertisement.startDate >= advertisement.endDate) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'End date must be after start date',
       });
+      return;
     }
 
     await advertisementRepository.save(advertisement);
@@ -274,7 +281,7 @@ export const updateAdvertisement = async (req: Request, res: Response) => {
 };
 
 // Delete advertisement
-export const deleteAdvertisement = async (req: Request, res: Response) => {
+export const deleteAdvertisement = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -283,10 +290,11 @@ export const deleteAdvertisement = async (req: Request, res: Response) => {
     });
 
     if (!advertisement) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Advertisement not found',
       });
+      return;
     }
 
     await advertisementRepository.remove(advertisement);
@@ -305,7 +313,7 @@ export const deleteAdvertisement = async (req: Request, res: Response) => {
 };
 
 // Track advertisement click
-export const trackClick = async (req: Request, res: Response) => {
+export const trackClick = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -314,10 +322,11 @@ export const trackClick = async (req: Request, res: Response) => {
     });
 
     if (!advertisement) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Advertisement not found',
       });
+      return;
     }
 
     advertisement.clicks += 1;
@@ -337,7 +346,7 @@ export const trackClick = async (req: Request, res: Response) => {
 };
 
 // Track advertisement view
-export const trackView = async (req: Request, res: Response) => {
+export const trackView = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -346,10 +355,11 @@ export const trackView = async (req: Request, res: Response) => {
     });
 
     if (!advertisement) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Advertisement not found',
       });
+      return;
     }
 
     advertisement.views += 1;
