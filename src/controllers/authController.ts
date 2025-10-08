@@ -252,6 +252,144 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
+export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    const { fullName, phone, address } = req.body;
+
+    // Validate input
+    if (!fullName || fullName.trim().length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Full name is required'
+      });
+      return;
+    }
+
+    // Get user repository
+    const userRepository = AppDataSource.getRepository(User);
+
+    // Find user
+    const user = await userRepository.findOne({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    // Update user fields
+    user.fullName = fullName.trim();
+    if (phone !== undefined) {
+      user.phone = phone;
+    }
+    // Note: address field needs to be added to User entity if you want to store it
+
+    // Save updated user
+    await userRepository.save(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        phoneNumber: user.phone,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+export const changePassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required'
+      });
+      return;
+    }
+
+    // Validate new password strength
+    if (newPassword.length < 8) {
+      res.status(400).json({
+        success: false,
+        message: 'New password must be at least 8 characters long'
+      });
+      return;
+    }
+
+    // Check for at least one uppercase and one lowercase letter
+    if (!/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword)) {
+      res.status(400).json({
+        success: false,
+        message: 'Password must contain at least one uppercase and one lowercase letter'
+      });
+      return;
+    }
+
+    // Get user repository
+    const userRepository = AppDataSource.getRepository(User);
+
+    // Find user
+    const user = await userRepository.findOne({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    // Verify current password using the User entity method
+    const isValidPassword = await user.comparePassword(currentPassword);
+    if (!isValidPassword) {
+      res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+      return;
+    }
+
+    // Set new password (will be automatically hashed by BeforeUpdate hook)
+    user.password = newPassword;
+
+    // Save updated user
+    await userRepository.save(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
 export const refreshToken = async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, refreshToken } = req.body;

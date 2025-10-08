@@ -1,9 +1,11 @@
 import { Router } from 'express';
-import { 
-  register, 
-  login, 
-  getProfile, 
-  refreshToken, 
+import {
+  register,
+  login,
+  getProfile,
+  updateProfile,
+  changePassword,
+  refreshToken,
   logout,
   verifyEmail,
   resendVerification,
@@ -34,6 +36,8 @@ router.get('/validate-reset-token/:token', validateResetToken);
 
 // Protected routes
 router.get('/profile', authenticate, getProfile);
+router.put('/profile', authenticate, updateProfile);
+router.post('/change-password', authenticate, changePassword);
 router.post('/logout', authenticate, logout);
 
 export default router;
