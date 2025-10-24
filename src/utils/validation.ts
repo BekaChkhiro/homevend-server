@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+// Shared password validation schema
+const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(255, 'Password cannot exceed 255 characters')
+  .regex(
+    /^(?=.*[a-z])(?=.*[A-Z]).*$/,
+    'Password must contain at least one uppercase and one lowercase letter'
+  );
+
 export const registerSchema = z.object({
   body: z.object({
     fullName: z
@@ -11,10 +21,7 @@ export const registerSchema = z.object({
       .string()
       .email('Please provide a valid email address')
       .max(255, 'Email cannot exceed 255 characters'),
-    password: z
-      .string()
-      .min(6, 'Password must be at least 6 characters')
-      .max(255, 'Password cannot exceed 255 characters'),
+    password: passwordSchema,
     role: z
       .enum(['user', 'admin', 'agency', 'developer'])
       .optional()
@@ -68,13 +75,8 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   body: z.object({
-    password: z
-      .string()
-      .min(6, 'Password must be at least 6 characters')
-      .max(255, 'Password cannot exceed 255 characters'),
-    confirmPassword: z
-      .string()
-      .min(6, 'Password must be at least 6 characters')
+    password: passwordSchema,
+    confirmPassword: passwordSchema
   }).refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
     path: ["confirmPassword"]
