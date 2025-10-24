@@ -143,7 +143,18 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     if (!propertyData.dealType) {
       requiredFieldErrors.push('Deal type is required');
     }
-    
+
+    // Check if all three descriptions are provided
+    if (!propertyData.descriptionGeorgian || propertyData.descriptionGeorgian.trim().length === 0) {
+      requiredFieldErrors.push('Georgian description is required');
+    }
+    if (!propertyData.descriptionEnglish || propertyData.descriptionEnglish.trim().length === 0) {
+      requiredFieldErrors.push('English description is required');
+    }
+    if (!propertyData.descriptionRussian || propertyData.descriptionRussian.trim().length === 0) {
+      requiredFieldErrors.push('Russian description is required');
+    }
+
     if (requiredFieldErrors.length > 0) {
       console.error('🚨 =================================');
       console.error('❌ Missing required fields validation failed');

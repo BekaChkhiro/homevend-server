@@ -130,9 +130,9 @@ export const propertySchema = z.object({
     pricePerSqm: z.number().optional(),
     contactName: z.string().min(1, 'Contact name is required'),
     contactPhone: z.string().min(1, 'Contact phone is required'),
-    descriptionGeorgian: z.string().optional(),
-    descriptionEnglish: z.string().optional(),
-    descriptionRussian: z.string().optional()
+    descriptionGeorgian: z.string().min(1, 'Georgian description is required'),
+    descriptionEnglish: z.string().min(1, 'English description is required'),
+    descriptionRussian: z.string().min(1, 'Russian description is required')
   })
 });
 
