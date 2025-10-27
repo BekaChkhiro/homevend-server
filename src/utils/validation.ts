@@ -10,6 +10,20 @@ const passwordSchema = z
     'Password must contain at least one uppercase and one lowercase letter'
   );
 
+// Phone number validation schema
+// Allows only + and digits (0-9), minimum 9 characters, maximum 20 characters
+export const phoneNumberSchema = z
+  .string()
+  .regex(
+    /^[+0-9]{9,20}$/,
+    'Phone number must contain only + and digits (0-9), minimum 9 characters'
+  )
+  .min(9, 'Phone number must be at least 9 characters')
+  .max(20, 'Phone number cannot exceed 20 characters');
+
+// Optional phone number (can be empty or valid)
+export const optionalPhoneNumberSchema = phoneNumberSchema.optional().or(z.literal(''));
+
 export const registerSchema = z.object({
   body: z.object({
     fullName: z
@@ -28,13 +42,13 @@ export const registerSchema = z.object({
       .default('user'),
     agencyData: z.object({
       name: z.string().min(2, 'Agency name must be at least 2 characters').max(300, 'Agency name cannot exceed 300 characters'),
-      phone: z.string().min(7, 'Phone number must be at least 7 characters').max(20, 'Phone number cannot exceed 20 characters'),
+      phone: phoneNumberSchema,
       website: z.string().url('Invalid website URL').optional().or(z.literal('')),
       socialMediaUrl: z.string().url('Invalid social media URL').optional().or(z.literal(''))
     }).optional(),
     developerData: z.object({
       name: z.string().min(2, 'Developer name must be at least 2 characters').max(300, 'Developer name cannot exceed 300 characters'),
-      phone: z.string().min(7, 'Phone number must be at least 7 characters').max(20, 'Phone number cannot exceed 20 characters'),
+      phone: phoneNumberSchema,
       website: z.string().url('Invalid website URL').optional().or(z.literal('')),
       socialMediaUrl: z.string().url('Invalid social media URL').optional().or(z.literal(''))
     }).optional()
@@ -131,7 +145,7 @@ export const propertySchema = z.object({
     totalPrice: z.number().min(0.01, 'Total price is required'),
     pricePerSqm: z.number().optional(),
     contactName: z.string().min(1, 'Contact name is required'),
-    contactPhone: z.string().min(1, 'Contact phone is required'),
+    contactPhone: phoneNumberSchema,
     descriptionGeorgian: z.string().min(1, 'Georgian description is required'),
     descriptionEnglish: z.string().min(1, 'English description is required'),
     descriptionRussian: z.string().min(1, 'Russian description is required')
