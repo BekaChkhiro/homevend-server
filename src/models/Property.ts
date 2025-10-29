@@ -336,9 +336,6 @@ export class Property {
   @Column({ name: 'contact_phone', type: 'varchar', length: 20, nullable: false })
   contactPhone!: string;
 
-  @Column({ name: 'contact_email', type: 'varchar', length: 255, nullable: true })
-  contactEmail?: string;
-
   // Descriptions
   @Column({ name: 'description_georgian', type: 'text', nullable: true })
   descriptionGeorgian?: string;

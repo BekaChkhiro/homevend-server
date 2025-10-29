@@ -193,6 +193,11 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
       enumValidationErrors.push(`Invalid condition: "${propertyData.condition}". Valid values: ${Object.values(ConditionEnum).join(', ')}`);
     }
 
+    // Validate currency - Only USD is allowed (all prices stored in USD)
+    if (propertyData.currency && propertyData.currency !== 'USD') {
+      enumValidationErrors.push(`Invalid currency: "${propertyData.currency}". All prices must be in USD.`);
+    }
+
     // Validate numeric field ranges to prevent overflow errors
     if (propertyData.ceilingHeight !== undefined) {
       const height = Number(propertyData.ceilingHeight);
@@ -310,13 +315,10 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     if (propertyData.storageArea !== undefined) property.storageArea = propertyData.storageArea;
     if (propertyData.storageType) property.storageType = propertyData.storageType;
     
-    // Pricing
+    // Pricing - All prices stored in USD only
     if (propertyData.pricePerSqm !== undefined) property.pricePerSqm = propertyData.pricePerSqm;
-    property.currency = propertyData.currency || 'GEL';
-    
-    // Contact
-    if (propertyData.contactEmail) property.contactEmail = propertyData.contactEmail;
-    
+    property.currency = 'USD'; // All prices stored in USD only
+
     // Descriptions
     if (propertyData.descriptionGeorgian) property.descriptionGeorgian = propertyData.descriptionGeorgian;
     if (propertyData.descriptionEnglish) property.descriptionEnglish = propertyData.descriptionEnglish;
@@ -732,7 +734,6 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         'property.street',
         'property.contactName',
         'property.contactPhone',
-        'property.contactEmail',
         'property.viewCount',
         'property.favoriteCount',
         'property.inquiryCount',
@@ -1100,7 +1101,6 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       street: property.street,
       contactName: property.contactName,
       contactPhone: property.contactPhone,
-      contactEmail: property.contactEmail,
       viewCount: property.viewCount,
       favoriteCount: property.favoriteCount,
       inquiryCount: property.inquiryCount,
@@ -1553,13 +1553,10 @@ export const updateProperty = async (req: AuthenticatedRequest, res: Response): 
     if (propertyData.storageArea !== undefined) property.storageArea = propertyData.storageArea;
     if (propertyData.storageType !== undefined) property.storageType = propertyData.storageType;
     
-    // Pricing
+    // Pricing - All prices stored in USD only
     if (propertyData.pricePerSqm !== undefined) property.pricePerSqm = propertyData.pricePerSqm;
-    if (propertyData.currency !== undefined) property.currency = propertyData.currency;
-    
-    // Contact
-    if (propertyData.contactEmail !== undefined) property.contactEmail = propertyData.contactEmail;
-    
+    property.currency = 'USD'; // All prices stored in USD only
+
     // Descriptions
     if (propertyData.descriptionGeorgian !== undefined) property.descriptionGeorgian = propertyData.descriptionGeorgian;
     if (propertyData.descriptionEnglish !== undefined) property.descriptionEnglish = propertyData.descriptionEnglish;

@@ -20,6 +20,7 @@ import serviceExpirationRoutes from './serviceExpiration.js';
 import uploadRoutes from './upload.js';
 import termsConditionsRoutes from './termsConditionsRoutes.js';
 import advertisementRoutes from './advertisements.js';
+// import exchangeRateRoutes from './exchangeRates.js'; // TODO: Debug route handler issue
 
 const router = Router();
 
@@ -44,5 +45,6 @@ router.use('/service-expiration', serviceExpirationRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/terms-conditions', termsConditionsRoutes);
 router.use('/advertisements', advertisementRoutes);
+// router.use('/exchange-rates', exchangeRateRoutes); // TODO: Debug route handler issue
 
 export default router;

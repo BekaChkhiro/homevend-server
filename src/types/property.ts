@@ -143,7 +143,6 @@ export interface IProperty {
   // Contact Information
   contactName: string;
   contactPhone: string;
-  contactEmail?: string;
 
   // Descriptions
   descriptionGeorgian?: string;
@@ -240,7 +239,6 @@ export interface CreatePropertyInput {
   // Contact Information
   contactName: string;
   contactPhone: string;
-  contactEmail?: string;
   
   // Descriptions
   descriptionGeorgian?: string;
@@ -271,7 +269,6 @@ export interface PropertyResponse extends IProperty {
   user: {
     id: number;
     fullName: string;
-    email: string;
     phone?: string;
   };
 }

@@ -1,0 +1,28 @@
+import { Router } from 'express';
+import {
+  getCurrentRate,
+  refreshRate,
+  convertCurrency,
+  getCachedRate
+} from '../controllers/exchangeRateController.js';
+
+const router = Router();
+
+/**
+ * Exchange Rate Routes
+ * Base path: /api/exchange-rates
+ */
+
+// GET /api/exchange-rates/current - Get current exchange rate (public)
+router.get('/current', getCurrentRate);
+
+// GET /api/exchange-rates/cached - Get cached rate without fetching (public)
+router.get('/cached', getCachedRate);
+
+// GET /api/exchange-rates/convert - Convert between currencies (public)
+router.get('/convert', convertCurrency);
+
+// GET /api/exchange-rates/refresh - Force refresh rate (temporarily public for testing)
+router.get('/refresh', refreshRate);
+
+export default router;
