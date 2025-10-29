@@ -108,7 +108,7 @@ export const convertCurrency = async (req: Request, res: Response) => {
 
     const rate = await nbgService.getCurrentRate();
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         originalAmount: amountNum,
@@ -121,7 +121,7 @@ export const convertCurrency = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error converting currency:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to convert currency',
       error: error.message
@@ -144,7 +144,7 @@ export const getCachedRate = async (req: Request, res: Response) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         usdToGel: rate.usdToGel,
@@ -156,7 +156,7 @@ export const getCachedRate = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error getting cached rate:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to get cached rate',
       error: error.message
