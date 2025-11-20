@@ -94,7 +94,11 @@ export const authorize = (...roles: string[]) => {
 
 // Admin-only authorization middleware
 export const authorizeAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  console.log('[AUTHORIZE ADMIN] Checking admin access for:', req.method, req.originalUrl);
+  console.log('[AUTHORIZE ADMIN] User:', req.user?.email, 'Role:', req.user?.role);
+
   if (!req.user) {
+    console.log('[AUTHORIZE ADMIN] No user in request');
     res.status(401).json({
       success: false,
       message: 'Access denied. Authentication required.'
@@ -103,6 +107,7 @@ export const authorizeAdmin = (req: AuthenticatedRequest, res: Response, next: N
   }
 
   if (req.user.role !== 'admin') {
+    console.log('[AUTHORIZE ADMIN] Access denied - user is not admin');
     res.status(403).json({
       success: false,
       message: 'Access denied. Admin permissions required.'
@@ -110,5 +115,6 @@ export const authorizeAdmin = (req: AuthenticatedRequest, res: Response, next: N
     return;
   }
 
+  console.log('[AUTHORIZE ADMIN] Admin access granted');
   next();
 };

@@ -51,6 +51,22 @@ export const createAdvertisement = async (req: AuthenticatedRequest, res: Respon
       status = AdStatus.EXPIRED;
     }
 
+    // Check if there's already an active or pending ad for this placement
+    const existingAd = await advertisementRepository.findOne({
+      where: [
+        { placementId, status: AdStatus.ACTIVE },
+        { placementId, status: AdStatus.PENDING },
+      ],
+    });
+
+    if (existingAd) {
+      res.status(400).json({
+        success: false,
+        error: `There is already an ${existingAd.status} advertisement for this placement. Please delete it first or wait for it to expire.`,
+      });
+      return;
+    }
+
     // Create advertisement
     const advertisement = advertisementRepository.create({
       title,
@@ -249,12 +265,31 @@ export const updateAdvertisement = async (req: AuthenticatedRequest, res: Respon
     if (title !== undefined) advertisement.title = title;
     if (description !== undefined) advertisement.description = description;
     if (advertiser !== undefined) advertisement.advertiser = advertiser;
-    if (placementId !== undefined) advertisement.placementId = placementId;
     if (startDate !== undefined) advertisement.startDate = new Date(startDate);
     if (endDate !== undefined) advertisement.endDate = new Date(endDate);
     if (imageUrl !== undefined) advertisement.imageUrl = imageUrl;
     if (targetUrl !== undefined) advertisement.targetUrl = targetUrl;
     if (status !== undefined) advertisement.status = status;
+
+    // Check if placementId is being changed to one that already has an active/pending ad
+    if (placementId !== undefined && placementId !== advertisement.placementId) {
+      const existingAd = await advertisementRepository.findOne({
+        where: [
+          { placementId, status: AdStatus.ACTIVE },
+          { placementId, status: AdStatus.PENDING },
+        ],
+      });
+
+      if (existingAd && existingAd.id !== advertisement.id) {
+        res.status(400).json({
+          success: false,
+          error: `There is already an ${existingAd.status} advertisement for placement ${placementId}. Please delete it first or choose a different placement.`,
+        });
+        return;
+      }
+
+      advertisement.placementId = placementId;
+    }
 
     // Validate dates if both are provided
     if (advertisement.startDate >= advertisement.endDate) {
@@ -284,12 +319,16 @@ export const updateAdvertisement = async (req: AuthenticatedRequest, res: Respon
 export const deleteAdvertisement = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const advertisementId = Number(id);
+
+    console.log(`[DELETE] Attempting to delete advertisement with ID: ${advertisementId}`);
 
     const advertisement = await advertisementRepository.findOne({
-      where: { id: Number(id) },
+      where: { id: advertisementId },
     });
 
     if (!advertisement) {
+      console.log(`[DELETE] Advertisement not found with ID: ${advertisementId}`);
       res.status(404).json({
         success: false,
         error: 'Advertisement not found',
@@ -297,14 +336,54 @@ export const deleteAdvertisement = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
+    console.log(`[DELETE] Found advertisement:`, {
+      id: advertisement.id,
+      title: advertisement.title,
+      placementId: advertisement.placementId,
+      status: advertisement.status,
+    });
+
+    // First, delete any related images
+    const relatedImages = await imageRepository.find({
+      where: {
+        entityType: EntityType.ADVERTISEMENT,
+        entityId: advertisementId,
+      },
+    });
+
+    console.log(`[DELETE] Found ${relatedImages.length} related images to delete`);
+
+    if (relatedImages.length > 0) {
+      await imageRepository.remove(relatedImages);
+      console.log(`[DELETE] Successfully deleted ${relatedImages.length} related images`);
+    }
+
+    // Now delete the advertisement
     await advertisementRepository.remove(advertisement);
+    console.log(`[DELETE] Successfully deleted advertisement with ID: ${advertisementId}`);
+
+    // Verify deletion
+    const stillExists = await advertisementRepository.findOne({
+      where: { id: advertisementId },
+    });
+
+    if (stillExists) {
+      console.error(`[DELETE] ERROR: Advertisement still exists after deletion! ID: ${advertisementId}`);
+      res.status(500).json({
+        success: false,
+        error: 'Advertisement was not properly deleted',
+      });
+      return;
+    }
+
+    console.log(`[DELETE] Verified: Advertisement ${advertisementId} no longer exists in database`);
 
     res.json({
       success: true,
       message: 'Advertisement deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting advertisement:', error);
+    console.error('[DELETE] Error deleting advertisement:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete advertisement',
