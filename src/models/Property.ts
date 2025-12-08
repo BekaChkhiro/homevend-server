@@ -320,8 +320,11 @@ export class Property {
   @Column({ type: 'decimal', precision: 8, scale: 2, nullable: false })
   area!: number;
 
-  @Column({ name: 'total_price', type: 'decimal', precision: 12, scale: 2, nullable: false })
-  totalPrice!: number;
+  @Column({ name: 'total_price', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  totalPrice?: number;
+
+  @Column({ name: 'is_price_negotiable', type: 'boolean', default: false })
+  isPriceNegotiable!: boolean;
 
   @Column({ name: 'price_per_sqm', type: 'decimal', precision: 10, scale: 2, nullable: true })
   pricePerSqm?: number;

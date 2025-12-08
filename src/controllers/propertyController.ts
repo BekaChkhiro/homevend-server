@@ -128,8 +128,8 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     if (!propertyData.area) {
       requiredFieldErrors.push('Area is required');
     }
-    if (!propertyData.totalPrice) {
-      requiredFieldErrors.push('Total price is required');
+    if (!propertyData.isPriceNegotiable && !propertyData.totalPrice) {
+      requiredFieldErrors.push('Total price is required when price is not negotiable');
     }
     if (!propertyData.contactName) {
       requiredFieldErrors.push('Contact name is required');
@@ -227,7 +227,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
       }
     }
 
-    if (propertyData.totalPrice !== undefined) {
+    if (!propertyData.isPriceNegotiable && propertyData.totalPrice !== undefined) {
       const price = Number(propertyData.totalPrice);
       if (isNaN(price) || price <= 0 || price > 9999999999.99) {
         numericValidationErrors.push(`Invalid totalPrice: "${propertyData.totalPrice}". Must be between 0.01 and 9999999999.99`);
@@ -260,6 +260,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     property.street = propertyData.street;
     property.area = propertyData.area;
     property.totalPrice = propertyData.totalPrice;
+    property.isPriceNegotiable = propertyData.isPriceNegotiable || false;
     property.contactName = propertyData.contactName;
     property.contactPhone = propertyData.contactPhone;
     
@@ -341,7 +342,7 @@ export const createProperty = async (req: AuthenticatedRequest, res: Response): 
     if (propertyData.expiresAt) property.expiresAt = propertyData.expiresAt;
 
     // Calculate price per sqm if not provided
-    if (!property.pricePerSqm && property.totalPrice && property.area) {
+    if (!property.isPriceNegotiable && !property.pricePerSqm && property.totalPrice && property.area) {
       property.pricePerSqm = Number(property.totalPrice) / Number(property.area);
     }
 
@@ -696,6 +697,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
         'property.area',
         'property.totalPrice',
         'property.pricePerSqm',
+        'property.isPriceNegotiable',
         'property.currency',
         'property.rooms',
         'property.bedrooms',
