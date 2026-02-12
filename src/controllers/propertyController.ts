@@ -667,6 +667,7 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
       advantages,
       furnitureAppliances,
       isFeatured,
+      vipStatus,
       sort = 'newest'
     } = req.query;
     
@@ -973,6 +974,13 @@ export const getProperties = async (req: AuthenticatedRequest, res: Response): P
     // Featured filter
     if (isFeatured === 'true') {
       queryBuilder.andWhere('property.isFeatured = true');
+    }
+
+    // VIP status filter
+    if (vipStatus && vipStatus !== 'none' && vipStatus !== 'all') {
+      const now = new Date();
+      queryBuilder.andWhere('property.vipStatus = :vipStatus', { vipStatus });
+      queryBuilder.andWhere('property.vipExpiresAt > :now', { now });
     }
 
     // Apply sorting
